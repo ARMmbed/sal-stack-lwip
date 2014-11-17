@@ -22,7 +22,7 @@
 #include "lwipopts_conf.h"
 
 // Operating System 
-#define NO_SYS                      0
+#define NO_SYS                      1
 
 #if NO_SYS == 0
 #include "cmsis_os.h"
@@ -43,7 +43,13 @@
 #define DEFAULT_THREAD_STACKSIZE    512
 
 #define MEMP_NUM_SYS_TIMEOUT        16
-#endif
+
+#else // #if NO_SYS == 0
+
+#define SYS_LIGHTWEIGHT_PROT		1
+#define LWIP_RAW					1
+
+#endif // #if NO_SYS == 0
 
 // 32-bit alignment
 #define MEM_ALIGNMENT               4

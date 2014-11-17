@@ -28,8 +28,9 @@
 #include "lwip/def.h"
 #include "lwip/sys.h"
 #include "lwip/mem.h"
+#include "sys_arch.h"
 
- #if NO_SYS==1
+#if NO_SYS==1
 #include "cmsis.h"
 
 /* Saved total time in ms since timer was enabled */

@@ -42,6 +42,8 @@ typedef int16_t            s16_t;
 typedef uint32_t           u32_t; 
 typedef int32_t            s32_t; 
 typedef uintptr_t          mem_ptr_t; 
+// TODO: not sure this is the bext place for sys_prot_t
+typedef uint8_t sys_prot_t;
 
 /* Define (sn)printf formatters for these lwIP types */
 #define U16_F "hu"

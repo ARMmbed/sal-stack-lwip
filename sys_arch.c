@@ -36,6 +36,11 @@
 /* Saved total time in ms since timer was enabled */
 static volatile u32_t systick_timems;
 
+extern void eth_arch_timer_callback(void);
+
+// TODO: this uses 32-bit values to keep time, might want to consider switching to 64 bits
+// TODO: (unless lwIP handles timer overflows internally)
+
 /* Enable systick rate and interrupt */
 void SysTick_Init(void) {
     if (SysTick_Config(SystemCoreClock / 1000)) {
@@ -51,6 +56,7 @@ void SysTick_Init(void) {
  */
 void SysTick_Handler(void) {
     systick_timems++;
+    eth_arch_timer_callback();
 }
 
 /* Delay for the specified number of milliSeconds */

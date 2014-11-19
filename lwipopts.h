@@ -21,7 +21,7 @@
 
 #include "lwipopts_conf.h"
 
-// Operating System 
+// Operating System
 #define NO_SYS                      1
 
 #if NO_SYS == 0

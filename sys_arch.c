@@ -70,6 +70,21 @@ u32_t sys_now(void) {
   return (u32_t) systick_timems;
 }
 
+// TODO: the next two functions completely disable/enable interrupts to implement sys_arch_(un)protect. Bad idea.
+sys_prot_t sys_arch_protect(void) {
+  if (__get_PRIMASK() != 0)
+    return 1;
+  __set_PRIMASK(1);
+  return 0;
+}
+
+void sys_arch_unprotect(sys_prot_t lev) {
+  /* Only turn interrupts back on if they were originally on when the matching
+     sys_arch_protect() call was made. */
+  if(!lev)
+    __set_PRIMASK(0);
+}
+
 #else
 /* CMSIS-RTOS implementation of the lwip operating system abstraction */
 #include "arch/sys_arch.h"

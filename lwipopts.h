@@ -52,6 +52,7 @@
 #define LWIP_NETCONN                0
 #define LWIP_SOCKET                 0
 #define MEMP_NUM_SYS_TIMEOUT        16
+//#define LWIP_DEBUG                  0
 
 #endif // #if NO_SYS == 0
 
@@ -81,10 +82,10 @@
 
 // Debug Options
 // #define LWIP_DEBUG
-#define UDP_LPC_EMAC                LWIP_DBG_OFF
-#define SYS_DEBUG                   LWIP_DBG_OFF
+#define UDP_LPC_EMAC                LWIP_DBG_ON
+#define SYS_DEBUG                   LWIP_DBG_ON
 #define PPP_DEBUG                   LWIP_DBG_OFF
-#define IP_DEBUG                    LWIP_DBG_OFF
+#define IP_DEBUG                    LWIP_DBG_ON
 #define MEM_DEBUG                   LWIP_DBG_OFF
 #define MEMP_DEBUG                  LWIP_DBG_OFF
 #define PBUF_DEBUG                  LWIP_DBG_OFF
@@ -101,9 +102,9 @@
 #define TCP_OUTPUT_DEBUG            LWIP_DBG_OFF
 #define TCP_RST_DEBUG               LWIP_DBG_OFF
 #define TCP_QLEN_DEBUG              LWIP_DBG_OFF
-#define ETHARP_DEBUG                LWIP_DBG_OFF
-#define NETIF_DEBUG                 LWIP_DBG_OFF
-#define DHCP_DEBUG                  LWIP_DBG_OFF
+#define ETHARP_DEBUG                LWIP_DBG_ON
+#define NETIF_DEBUG                 LWIP_DBG_ON
+#define DHCP_DEBUG                  LWIP_DBG_ON
 
 #ifdef LWIP_DEBUG
 #define MEMP_OVERFLOW_CHECK         1

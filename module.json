@@ -1,20 +1,35 @@
-
 {
-    "name": "mbed-net-lwip",
-    "version": "0.0.0",
-    "description": "CMSIS-Core",
-    "keywords": [
-        "cmsis"
-    ],
-    "author": "name <email@arm.com>",
-    "repository": {
-        "url": "git@github.com:ARMmbed/mbed-net-lwip.git",
-        "type": "git"
-    },
-    "homepage": "https://github.com/ARMmbed/mbed-net-lwip",
-    "license": "Apache-2",
-    "dependencies": {},
-    "extraIncludes": ["mbed-net-lwip"],
-    "targetDependencies": {
+  "name": "mbed-net-lwip",
+  "version": "0.0.0",
+  "description": "Lightweight IP",
+  "keywords": [
+    "lwip",
+    "network",
+    "sockets"
+  ],
+  "author": "brendan.moran@arm.com",
+  "licenses": [
+    {
+      "url": "http://lwip.wikia.com/wiki/License",
+      "type": "BSD"
     }
+  ],
+  "extraIncludes": [
+    "mbed-net-lwip",
+    "mbed-net-lwip/arch",
+    "mbed-net-lwip/lwip",
+    "mbed-net-lwip/lwip/include",
+    "mbed-net-lwip/lwip/include/ipv4",
+    "mbed-net-lwip/lwip/include/netif"
+  ],
+  "dependencies": {
+    "mbed": "ARMmbed/mbed-sdk"
+    ,    "mbed-net-socket-abstract" : "ARMmbed/mbed-net-socket-abstract"
+  },
+  "targetDependencies": {
+    "lwip-k64f":{
+      "mbed-net-lwip-k64f":"ARMmbed/mbed-net-lwip-k64f",
+      "mbed-net-lwip-eth" : "ARMmbed/mbed-net-lwip-eth#master"
+    }
+  }
 }

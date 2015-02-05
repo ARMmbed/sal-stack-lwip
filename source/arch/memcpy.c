@@ -24,6 +24,8 @@
 */
 __attribute__((naked)) void thumb2_memcpy(void* pDest, const void* pSource, size_t length)
 {
+  //TODO: This function requires cleanup
+  (void) pDest; (void) pSource; (void) length;
     __asm (
         ".syntax unified\n"
         ".thumb\n"

@@ -108,18 +108,19 @@ static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
   socket_event_t e;
   e.event = SOCKET_EVENT_DNS;
   e.i.d.sock = sock;
-  e.i.d.addr = (struct socket_addr*) addr;
+  e.i.d.addr = (struct socket_addr *)addr;
   e.i.d.domain = name;
   sock->event = &e;
   handler();
 }
 
-socket_error_t socket_resolve(struct socket *sock, const char *address, void *addr)
+socket_error_t socket_resolve(struct socket *sock, const char *address, struct socket_addr *addr)
 {
+    struct ip_addr *ia = (struct ip_addr *)(void*)addr;
     // attempt to resolve with DNS or convert to ip addr
-    err_t err = dns_gethostbyname(address, (struct ip_addr *)addr, dnscb, sock);
+    err_t err = dns_gethostbyname(address, ia, dnscb, sock);
     if (err == ERR_OK) {
-        dnscb(address, (struct ip_addr *)addr, sock);
+        dnscb(address, ia, sock);
     }
     return error_remap(err);
 }
@@ -161,10 +162,27 @@ socket_error_t socket_create(struct socket *sock, socket_proto_family_t family, 
     return SOCKET_ERROR_NONE;
 }
 
-socket_error_t socket_destroy(struct socket *sock)
+socket_error_t socket_close(struct socket *sock)
 {
+    err_t err = ERR_OK;
     if (sock == NULL)
         return SOCKET_ERROR_NULL_PTR;
+    switch (sock->family) {
+    case SOCKET_DGRAM:
+        udp_disconnect((struct udp_pcb *)sock->impl);
+        break;
+    case SOCKET_STREAM:
+        err = tcp_close((struct tcp_pcb *)sock->impl);
+        break;
+    default:
+        return SOCKET_ERROR_BAD_FAMILY;
+    }
+    return error_remap(err);
+}
+void socket_abort(struct socket *sock)
+{
+    if (sock == NULL)
+        return;
     switch (sock->family) {
     case SOCKET_DGRAM:
         udp_remove((struct udp_pcb *)sock->impl);
@@ -173,8 +191,12 @@ socket_error_t socket_destroy(struct socket *sock)
         tcp_abort((struct tcp_pcb *)sock->impl);
         break;
     default:
-        return SOCKET_ERROR_BAD_FAMILY;
+        break;
     }
+}
+socket_error_t socket_destroy(struct socket *sock)
+{
+    socket_abort(sock);
     return SOCKET_ERROR_NONE;
 }
 
@@ -192,6 +214,7 @@ static err_t onConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
     else
     {
         e.event = SOCKET_EVENT_CONNECT;
+        sock->status |= SOCKET_STATUS_CONNECTED;
     }
     sock->event = &e;
     handler();
@@ -233,7 +256,11 @@ static err_t tcp_sent_callback(void * arg, struct tcp_pcb *pcb, uint16_t len)
   struct socket *sock = (struct socket *)arg;
   socket_api_handler_t handler = (socket_api_handler_t) sock->handler;
   (void) pcb;
-  (void) len;
+  socket_event_t e;
+  e.event = SOCKET_EVENT_TX_DONE;
+  e.i.t.sentbytes = len;
+  e.i.t.sock = sock;
+  sock->event = &e; // TODO: (CThunk upgrade/Alpha2)
   handler();
   return ERR_OK;
 }
@@ -297,6 +324,7 @@ socket_error_t socket_start_send(struct socket *sock, struct socket_buffer *buf,
             return SOCKET_ERROR_SIZE;
         }
         err = tcp_write(pcb, dptr, dsize, buf->flags); //send data
+        break;
     }
     default:
         return SOCKET_ERROR_BAD_FAMILY;
@@ -345,8 +373,38 @@ static void recv_free(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     s->event = &e; // TODO: (CThunk upgrade/Alpha3)
     handler();
 
-    if(e.i.r.free_buf)
+
+    if(e.i.r.free_buf) {
         socket_buf_free(&e.i.r.buf);
+    }
+}
+
+static err_t tcp_recv_free(void * arg, struct tcp_pcb * tpcb,
+               struct pbuf * p, err_t err) {
+    (void) err;
+    struct socket *s = (struct socket *)arg;
+    socket_api_handler_t handler = (socket_api_handler_t)s->handler;
+    socket_event_t e;
+    e.event = SOCKET_EVENT_RX_DONE;
+    e.i.r.buf.impl = (void *)p;
+    e.i.r.buf.type = SOCKET_BUFFER_LWIP_PBUF;
+    e.i.r.buf.flags = 0;
+    e.i.r.sock = s;
+    // Assume that the library will free the buffer unless the client
+    // overrides the free.
+    e.i.r.free_buf = 1;
+
+    // Make sure the busy flag is cleared in case the client wants to start another receive
+    s->status = (socket_status_t)((int)s->status & ~SOCKET_STATUS_RX_BUSY);
+
+    s->event = &e; // TODO: (CThunk upgrade/Alpha3)
+    handler();
+
+    if(e.i.r.free_buf) {
+        socket_buf_free(&e.i.r.buf);
+    }
+    tcp_recved(tpcb, socket_buf_get_size(&e.i.r.buf));
+    return ERR_OK; //TODO: can this be improved?
 }
 
 socket_error_t socket_start_recv(struct socket *sock) {
@@ -356,9 +414,12 @@ socket_error_t socket_start_recv(struct socket *sock) {
     switch (sock->family) {
     case SOCKET_DGRAM:
         sock->status = (socket_status_t)((int)sock->status | SOCKET_STATUS_RX_BUSY);
-        udp_recv((struct udp_pcb *)sock->impl, recv_free, (void *)sock); break;
+        udp_recv((struct udp_pcb *)sock->impl, recv_free, (void *)sock);
+        break;
     case SOCKET_STREAM:
-        //TODO: TCP receive
+        sock->status = (socket_status_t)((int)sock->status | SOCKET_STATUS_RX_BUSY);
+        tcp_recv((struct tcp_pcb *)sock->impl, tcp_recv_free);
+        break;
     default:
         return SOCKET_ERROR_BAD_FAMILY;
     }
@@ -375,7 +436,7 @@ uint8_t socket_is_connected(const struct socket *sock) {
             return 1;
         return 0;
     case SOCKET_STREAM:
-        //TODO: TCP is connected
+        return !! (sock->status & SOCKET_STATUS_CONNECTED);
     default:
         break;
     }

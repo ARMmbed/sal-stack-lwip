@@ -108,7 +108,8 @@ static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
   socket_event_t e;
   e.event = SOCKET_EVENT_DNS;
   e.i.d.sock = sock;
-  e.i.d.addr = (struct socket_addr *)addr;
+  e.i.d.addr.type = sock->stack;
+  e.i.d.addr.impl = addr;
   e.i.d.domain = name;
   sock->event = &e;
   handler();
@@ -362,7 +363,8 @@ static void recv_free(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     e.i.r.buf.flags = 0;
     e.i.r.sock = s;
     e.i.r.port = port;
-    e.i.r.src = (struct socket_addr *)addr;
+    e.i.r.src.type = SOCKET_STACK_LWIP_IPV4;
+    e.i.r.src.impl = addr;
     // Assume that the library will free the buffer unless the client
     // overrides the free.
     e.i.r.free_buf = 1;

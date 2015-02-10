@@ -108,7 +108,7 @@ static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
   socket_event_t e;
   e.event = SOCKET_EVENT_DNS;
   e.i.d.sock = sock;
-  e.i.d.addr.type = sock->stack;
+  e.i.d.addr.type = SOCKET_STACK_LWIP_IPV4;
   e.i.d.addr.impl = addr;
   e.i.d.domain = name;
   sock->event = &e;
@@ -117,7 +117,7 @@ static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
 
 socket_error_t socket_resolve(struct socket *sock, const char *address, struct socket_addr *addr)
 {
-    struct ip_addr *ia = (struct ip_addr *)(void*)addr;
+    struct ip_addr *ia = addr->impl;
     // attempt to resolve with DNS or convert to ip addr
     err_t err = dns_gethostbyname(address, ia, dnscb, sock);
     if (err == ERR_OK) {
@@ -222,29 +222,31 @@ static err_t onConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
     return ERR_OK;
 }
 
-socket_error_t socket_connect(struct socket *sock, const void *address, const uint16_t port) {
+socket_error_t socket_connect(struct socket *sock, struct socket_addr *address, const uint16_t port)
+{
     err_t err = ERR_OK;
     switch (sock->family){
     case SOCKET_DGRAM:
-        err = udp_connect((struct udp_pcb *)sock->impl, (ip_addr_t *)address, port);
+        err = udp_connect((struct udp_pcb *)sock->impl, address->impl, port);
         break;
     case SOCKET_STREAM:
         tcp_arg((struct tcp_pcb *)sock->impl, (void*) sock);
-        err = tcp_connect((struct tcp_pcb *)sock->impl, (ip_addr_t *)address, port, onConnect);
+        err = tcp_connect((struct tcp_pcb *)sock->impl, address->impl, port, onConnect);
         break;
     default:
         return SOCKET_ERROR_BAD_FAMILY;
     }
     return error_remap(err);
 }
-socket_error_t socket_bind(struct socket *sock, const void *address, const uint16_t port) {
+socket_error_t socket_bind(struct socket *sock, struct socket_addr *address, const uint16_t port)
+{
     err_t err = ERR_OK;
     switch (sock->family){
     case SOCKET_DGRAM:
-        err = udp_bind((struct udp_pcb *)sock->impl, (ip_addr_t *)address, port);
+        err = udp_bind((struct udp_pcb *)sock->impl, address->impl, port);
         break;
     case SOCKET_STREAM:
-        err = tcp_bind((struct tcp_pcb *)sock->impl, (ip_addr_t *)address, port);
+        err = tcp_bind((struct tcp_pcb *)sock->impl, address->impl, port);
         break;
     default:
         return SOCKET_ERROR_BAD_FAMILY;

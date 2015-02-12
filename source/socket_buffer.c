@@ -1,9 +1,3 @@
-/*
- * socket_buffer.c
- *
- *  Created on: 2 Dec 2014
- *      Author: bremor01
- */
 
 #include "lwip/pbuf.h"
 #include "socket_types_impl.h"
@@ -55,7 +49,7 @@ void socket_buf_free(struct socket_buffer *b)
 socket_error_t socket_copy_from_user(struct socket_buffer *b, const void *u, const size_t len)
 {
     err_t err = pbuf_take((b->impl), u, len);
-    return socket_error_remap(err);
+    return lwipv4_socket_error_remap(err);
 }
 uint16_t socket_copy_to_user(void *u, const struct socket_buffer *b, const size_t len)
 {

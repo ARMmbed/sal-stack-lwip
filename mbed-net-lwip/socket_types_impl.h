@@ -10,7 +10,7 @@
 
 #include "socket_types.h"
 #include "lwip/err.h"
-socket_error_t socket_error_remap(err_t lwip_err);
+socket_error_t lwipv4_socket_error_remap(err_t lwip_err);
 
 
 

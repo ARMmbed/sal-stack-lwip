@@ -10,6 +10,10 @@
 
 #include "socket_api.h"
 #include "socket_buffer.h"
+
+// TODO: Remove when yotta supports init
+#include "lwipv4_init.h"
+
 #include "lwip/netif.h"
 #include "lwip/sockets.h"
 #include "lwip/udp.h"
@@ -17,12 +21,22 @@
 #include "lwip/tcp_impl.h"
 #include "lwip/timers.h"
 #include "lwip/dns.h"
+#include "lwip/ip_addr.h"
 
 
 uint32_t TCPSockets = 0;
 
+const struct socket_api lwipv4_socket_api;
+static uint8_t lwipv4_socket_tx_is_busy(const struct socket *sock);
+static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock);
 
-socket_error_t error_remap(err_t lwip_err)
+
+
+socket_error_t lwipv4_socket_init() {
+    return socket_register_stack(&lwipv4_socket_api);
+}
+
+socket_error_t lwipv4_socket_error_remap(err_t lwip_err)
 {
     socket_error_t err = SOCKET_ERROR_UNKNOWN;
     switch (lwip_err) {
@@ -50,15 +64,28 @@ socket_error_t error_remap(err_t lwip_err)
     case ERR_CLSD:
     case ERR_CONN:
     case ERR_ARG:
-    case (ERR_IF):
+    case ERR_IF:
     break;
     }
     return err;
 }
 
-socket_error_t socket_error_remap(int32_t err)
+static socket_error_t init()
 {
-    return error_remap((err_t) err);
+    return SOCKET_ERROR_NONE;
+}
+static socket_error_t start_listen(struct socket *socket, const struct socket_addr *address, const uint16_t port, socket_api_handler_t const handler)
+{
+    (void)socket;
+    (void)address;
+    (void)port;
+    (void)handler;
+    return SOCKET_ERROR_UNKNOWN;
+}
+static socket_error_t stop_listen(struct socket *socket)
+{
+    (void)socket;
+    return SOCKET_ERROR_UNKNOWN;
 }
 
 //static uint8_t family_remap(socket_proto_family_t family) {
@@ -78,9 +105,9 @@ socket_error_t socket_error_remap(int32_t err)
 //}
 
 
-socket_api_handler_t socket_periodic_task(const struct socket * sock)
+static socket_api_handler_t lwipv4_socket_periodic_task(const struct socket * sock)
 {
-    switch(sock->stack)
+    switch(sock->family)
     {
         case SOCKET_STREAM:
             return sys_check_timeouts;
@@ -89,9 +116,9 @@ socket_api_handler_t socket_periodic_task(const struct socket * sock)
     }
     return NULL;
 }
-uint32_t socket_periodic_interval(const struct socket * sock)
+static uint32_t lwipv4_socket_periodic_interval(const struct socket * sock)
 {
-    switch(sock->stack)
+    switch(sock->family)
     {
         case SOCKET_STREAM:
             return TCP_TMR_INTERVAL;
@@ -106,31 +133,32 @@ static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
   struct socket *sock = (struct socket *)arg;
   socket_api_handler_t handler = (socket_api_handler_t) sock->handler;
   socket_event_t e;
-  e.event = SOCKET_EVENT_DNS;
-  e.i.d.sock = sock;
-  e.i.d.addr.type = SOCKET_STACK_LWIP_IPV4;
-  e.i.d.addr.impl = addr;
-  e.i.d.domain = name;
+  if (addr == NULL) {
+      e.event = SOCKET_EVENT_ERROR;
+      e.i.e = SOCKET_ERROR_DNS_FAILED;
+  } else {
+      e.event = SOCKET_EVENT_DNS;
+      e.i.d.sock = sock;
+      e.i.d.addr.type = SOCKET_STACK_LWIP_IPV4;
+      e.i.d.addr.impl = addr;
+      e.i.d.domain = name;
+  }
   sock->event = &e;
   handler();
 }
 
-socket_error_t socket_resolve(struct socket *sock, const char *address, struct socket_addr *addr)
+static socket_error_t lwipv4_socket_resolve(struct socket *sock, const char *address)
 {
-    struct ip_addr *ia = addr->impl;
+    struct ip_addr ia;
     // attempt to resolve with DNS or convert to ip addr
-    err_t err = dns_gethostbyname(address, ia, dnscb, sock);
+    err_t err = dns_gethostbyname(address, &ia, dnscb, sock);
     if (err == ERR_OK) {
-        dnscb(address, ia, sock);
+        dnscb(address, &ia, sock);
     }
-    return error_remap(err);
+    return lwipv4_socket_error_remap(err);
 }
 
-socket_error_t socket_init() {
-    return SOCKET_ERROR_NONE;
-}
-
-socket_error_t socket_create(struct socket *sock, socket_proto_family_t family, socket_api_handler_t handler)
+static socket_error_t lwipv4_socket_create(struct socket *sock, socket_proto_family_t family, socket_api_handler_t handler)
 {
     if (sock == NULL)
         return SOCKET_ERROR_NULL_PTR;
@@ -163,7 +191,7 @@ socket_error_t socket_create(struct socket *sock, socket_proto_family_t family, 
     return SOCKET_ERROR_NONE;
 }
 
-socket_error_t socket_close(struct socket *sock)
+static socket_error_t lwipv4_socket_close(struct socket *sock)
 {
     err_t err = ERR_OK;
     if (sock == NULL)
@@ -178,9 +206,9 @@ socket_error_t socket_close(struct socket *sock)
     default:
         return SOCKET_ERROR_BAD_FAMILY;
     }
-    return error_remap(err);
+    return lwipv4_socket_error_remap(err);
 }
-void socket_abort(struct socket *sock)
+static void lwipv4_socket_abort(struct socket *sock)
 {
     if (sock == NULL)
         return;
@@ -195,9 +223,9 @@ void socket_abort(struct socket *sock)
         break;
     }
 }
-socket_error_t socket_destroy(struct socket *sock)
+static socket_error_t lwipv4_socket_destroy(struct socket *sock)
 {
-    socket_abort(sock);
+    lwipv4_socket_abort(sock);
     return SOCKET_ERROR_NONE;
 }
 
@@ -210,7 +238,7 @@ static err_t onConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
     if (err != ERR_OK)
     {
         e.event = SOCKET_EVENT_ERROR;
-        e.i.e = error_remap(err);
+        e.i.e = lwipv4_socket_error_remap(err);
     }
     else
     {
@@ -222,7 +250,7 @@ static err_t onConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
     return ERR_OK;
 }
 
-socket_error_t socket_connect(struct socket *sock, struct socket_addr *address, const uint16_t port)
+static socket_error_t lwipv4_socket_connect(struct socket *sock, const struct socket_addr *address, const uint16_t port)
 {
     err_t err = ERR_OK;
     switch (sock->family){
@@ -236,9 +264,26 @@ socket_error_t socket_connect(struct socket *sock, struct socket_addr *address, 
     default:
         return SOCKET_ERROR_BAD_FAMILY;
     }
-    return error_remap(err);
+    return lwipv4_socket_error_remap(err);
 }
-socket_error_t socket_bind(struct socket *sock, struct socket_addr *address, const uint16_t port)
+static socket_error_t str2addr(const struct socket *sock, struct socket_addr *address, const char *addr)
+{
+    socket_error_t err = SOCKET_ERROR_NONE;
+    switch(sock->stack)  {
+    case SOCKET_STACK_LWIP_IPV4:
+        if (ipaddr_aton(addr, address->impl) == -1) {
+            err = SOCKET_ERROR_BAD_ADDRESS;
+            address->type = SOCKET_STACK_UNINIT;
+        }
+        address->type = sock->stack;
+        break;
+    default:
+        break;
+    }
+    return err;
+}
+
+static socket_error_t lwipv4_socket_bind(struct socket *sock, const struct socket_addr *address, const uint16_t port)
 {
     err_t err = ERR_OK;
     switch (sock->family){
@@ -251,7 +296,7 @@ socket_error_t socket_bind(struct socket *sock, struct socket_addr *address, con
     default:
         return SOCKET_ERROR_BAD_FAMILY;
     }
-    return error_remap(err);
+    return lwipv4_socket_error_remap(err);
 }
 
 static err_t tcp_sent_callback(void * arg, struct tcp_pcb *pcb, uint16_t len)
@@ -285,10 +330,10 @@ static err_t tcp_sent_callback(void * arg, struct tcp_pcb *pcb, uint16_t len)
 //   //     socket_buf_try_free(buf);
 //   //   }
 //   // }
-//   return error_remap(err);
+//   return lwipv4_socket_error_remap(err);
 // }
 
-socket_error_t socket_start_send(struct socket *sock, struct socket_buffer *buf, void *arg)
+static socket_error_t lwipv4_socket_start_send(struct socket *sock, struct socket_buffer *buf, void *arg)
 {
     // flags:
     //    buffer type: (void* vs pbuf)
@@ -348,7 +393,7 @@ socket_error_t socket_start_send(struct socket *sock, struct socket_buffer *buf,
             socket_buf_try_free(buf);
         }
     }
-    return error_remap(err);
+    return lwipv4_socket_error_remap(err);
     return SOCKET_ERROR_NONE;
 }
 
@@ -411,10 +456,10 @@ static err_t tcp_recv_free(void * arg, struct tcp_pcb * tpcb,
     return ERR_OK; //TODO: can this be improved?
 }
 
-socket_error_t socket_start_recv(struct socket *sock) {
+static socket_error_t lwipv4_socket_start_recv(struct socket *sock) {
     err_t err = ERR_OK;
 
-    if (socket_rx_is_busy(sock)) return SOCKET_ERROR_BUSY;
+    if (lwipv4_socket_rx_is_busy(sock)) return SOCKET_ERROR_BUSY;
     switch (sock->family) {
     case SOCKET_DGRAM:
         sock->status = (socket_status_t)((int)sock->status | SOCKET_STATUS_RX_BUSY);
@@ -429,11 +474,11 @@ socket_error_t socket_start_recv(struct socket *sock) {
     }
     if(err == ERR_OK)
         sock->status = (socket_status_t)((int)sock->status | SOCKET_STATUS_RX_BUSY);
-    return error_remap(err);
+    return lwipv4_socket_error_remap(err);
 
 }
 
-uint8_t socket_is_connected(const struct socket *sock) {
+static uint8_t lwipv4_socket_is_connected(const struct socket *sock) {
     switch (sock->family) {
     case SOCKET_DGRAM:
         if (((struct udp_pcb *)sock->impl)->flags & UDP_FLAGS_CONNECTED)
@@ -446,7 +491,7 @@ uint8_t socket_is_connected(const struct socket *sock) {
     }
     return 0;
 }
-uint8_t socket_is_bound(const struct socket *sock) {
+static uint8_t lwipv4_socket_is_bound(const struct socket *sock) {
     switch (sock->family) {
     case SOCKET_DGRAM:
         if (((struct udp_pcb *)sock->impl)->local_port != 0)
@@ -460,9 +505,33 @@ uint8_t socket_is_bound(const struct socket *sock) {
     return 0;
 }
 
-uint8_t socket_tx_is_busy(const struct socket *sock) {
+static uint8_t lwipv4_socket_tx_is_busy(const struct socket *sock) {
     return !!(sock->status & SOCKET_STATUS_TX_BUSY);
 }
-uint8_t socket_rx_is_busy(const struct socket *sock) {
+static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock) {
     return !!(sock->status & SOCKET_STATUS_RX_BUSY);
 }
+
+const struct socket_api lwipv4_socket_api = {
+    .stack = SOCKET_STACK_LWIP_IPV4,
+    .init = init,
+    .create = lwipv4_socket_create,
+    .destroy = lwipv4_socket_destroy,
+    .close = lwipv4_socket_close,
+    .abort = lwipv4_socket_abort,
+    .periodic_task = lwipv4_socket_periodic_task,
+    .periodic_interval = lwipv4_socket_periodic_interval,
+    .resolve = lwipv4_socket_resolve,
+    .connect = lwipv4_socket_connect,
+    .str2addr = str2addr,
+    .bind = lwipv4_socket_bind,
+    .start_listen = start_listen,
+    .stop_listen = stop_listen,
+    .start_send = lwipv4_socket_start_send,
+    .start_recv = lwipv4_socket_start_recv,
+    .is_connected = lwipv4_socket_is_connected,
+    .is_bound = lwipv4_socket_is_bound,
+    .tx_busy = lwipv4_socket_tx_is_busy,
+    .rx_busy = lwipv4_socket_rx_is_busy,
+    .pbuf_type = SOCKET_BUFFER_LWIP_PBUF,
+};

@@ -1,8 +1,6 @@
 /*
- * udp_socket.c
- *
- *  Created on: 28 Nov 2014
- *      Author: bremor01
+ * PackageLicenseDeclared: Apache-2.0
+ * Copyright 2015 ARM Holdings PLC
  */
 
 #include <stddef.h>
@@ -24,13 +22,12 @@
 #include "lwip/ip_addr.h"
 
 
+
 uint32_t TCPSockets = 0;
 
 const struct socket_api lwipv4_socket_api;
 static uint8_t lwipv4_socket_tx_is_busy(const struct socket *sock);
 static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock);
-
-
 
 socket_error_t lwipv4_socket_init() {
     return socket_register_stack(&lwipv4_socket_api);
@@ -390,7 +387,7 @@ static socket_error_t lwipv4_socket_start_send(struct socket *sock, struct socke
         sock->event = &e; // TODO: (CThunk upgrade/Alpha2)
         handler();
         if (e.i.t.free_buf) {
-            socket_buf_try_free(buf);
+            sock->api->buf_api.try_free(buf);
         }
     }
     return lwipv4_socket_error_remap(err);
@@ -407,6 +404,7 @@ static void recv_free(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     e.event = SOCKET_EVENT_RX_DONE;
     e.i.r.buf.impl = (void *)p;
     e.i.r.buf.type = SOCKET_BUFFER_LWIP_PBUF;
+    e.i.r.buf.api = &lwipv4_socket_api.buf_api;
     e.i.r.buf.flags = 0;
     e.i.r.sock = s;
     e.i.r.port = port;
@@ -424,7 +422,7 @@ static void recv_free(void *arg, struct udp_pcb *pcb, struct pbuf *p,
 
 
     if(e.i.r.free_buf) {
-        socket_buf_free(&e.i.r.buf);
+        s->api->buf_api.free(&e.i.r.buf);
     }
 }
 
@@ -437,6 +435,7 @@ static err_t tcp_recv_free(void * arg, struct tcp_pcb * tpcb,
     e.event = SOCKET_EVENT_RX_DONE;
     e.i.r.buf.impl = (void *)p;
     e.i.r.buf.type = SOCKET_BUFFER_LWIP_PBUF;
+    e.i.r.buf.api = &lwipv4_socket_api.buf_api;
     e.i.r.buf.flags = 0;
     e.i.r.sock = s;
     // Assume that the library will free the buffer unless the client
@@ -449,10 +448,10 @@ static err_t tcp_recv_free(void * arg, struct tcp_pcb * tpcb,
     s->event = &e; // TODO: (CThunk upgrade/Alpha3)
     handler();
 
+    tcp_recved(tpcb, s->api->buf_api.get_size(&e.i.r.buf));
     if(e.i.r.free_buf) {
-        socket_buf_free(&e.i.r.buf);
+        s->api->buf_api.free(&e.i.r.buf);
     }
-    tcp_recved(tpcb, socket_buf_get_size(&e.i.r.buf));
     return ERR_OK; //TODO: can this be improved?
 }
 
@@ -511,10 +510,21 @@ static uint8_t lwipv4_socket_tx_is_busy(const struct socket *sock) {
 static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock) {
     return !!(sock->status & SOCKET_STATUS_RX_BUSY);
 }
+#include "lwip_socket_buffer.h"
 
 const struct socket_api lwipv4_socket_api = {
     .stack = SOCKET_STACK_LWIP_IPV4,
     .init = init,
+    .buf_api = {
+        //.stack_to_buf = ,
+        .get_ptr = lwip_buf_get_ptr,
+        .get_size = lwip_buf_get_size,
+        .alloc = lwip_buf_alloc,
+        .try_free = lwip_buf_try_free,
+        .free = lwip_buf_free,
+        .u2b = lwip_copy_from_user,
+        .b2u = lwip_copy_to_user,
+    },
     .create = lwipv4_socket_create,
     .destroy = lwipv4_socket_destroy,
     .close = lwipv4_socket_close,

@@ -29,6 +29,22 @@ const struct socket_api lwipv4_socket_api;
 static uint8_t lwipv4_socket_tx_is_busy(const struct socket *sock);
 static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock);
 
+struct pbuf_wrapper {
+	struct pbuf_wrapper *next;
+	struct pbuf *p;
+	struct ip_addr *addr;
+	uint16_t port;
+};
+
+void irqRecv(void * arg, struct udp_pcb * upcb,
+        struct pbuf * p,
+        struct ip_addr * addr,
+        u16_t port)
+{
+	struct socket *s = (struct socket *) arg;
+	struct pbuf_wrapper *w = (struct pbuf_wrapper *)s->rxBufChain;
+}
+
 socket_error_t lwipv4_socket_init() {
     return socket_register_stack(&lwipv4_socket_api);
 }
@@ -71,17 +87,58 @@ static socket_error_t init()
 {
     return SOCKET_ERROR_NONE;
 }
-static socket_error_t start_listen(struct socket *socket, const struct socket_addr *address, const uint16_t port, socket_api_handler_t const handler)
+
+static err_t irqAccept (void * arg, struct tcp_pcb * newpcb, err_t err)
 {
-    (void)socket;
-    (void)address;
-    (void)port;
-    (void)handler;
-    return SOCKET_ERROR_UNKNOWN;
+    socket_event_t e;
+    if (err != ERR_OK) {
+        e.event = SOCKET_EVENT_ERROR;
+        e.i.e = lwipv4_socket_error_remap(err);
+        err = ERR_OK;
+        s->event = &e;
+        handler(&e);
+        s->event = NULL;
+    } else {
+        struct socket *s = arg
+        handler_t handler = s->handler;
+        e.event = SOCKET_EVENT_ACCEPT;
+        e.i.a.sock = s;
+        e.i.a.newimpl = newpcb;
+        e.i.a.reject = 0;
+        s->event = &e;
+        handler(&e);
+        s->event = NULL;
+        if (e.i.a.reject) {
+            err = ERR_ABRT;
+            tcp_abort(newpcb);
+        }
+    }
+    return err;
+}
+static err_t irqAcceptNull (void * arg, struct tcp_pcb * newpcb, err_t err)
+{
+    (void) arg;
+    (void) err;
+    tcp_abort(newpcb);
+    return ERR_ABRT;
+}
+static socket_error_t start_listen(struct socket *socket)
+{
+    struct tcp_pcb * pcb = socket->impl;
+    if (pcb->state != LISTEN) {
+        socket->impl = tcp_listen(socket->impl)
+        if (socket->impl == NULL) {
+            return SOCKET_ERROR_BAD_ALLOC;
+        }
+    }
+    tcp_arg(socket->impl, socket);
+    tcp_accept(socket->impl, irqAccept);
+    socket->impl = listen_impl;
+    return SOCKET_ERROR_NONE;
 }
 static socket_error_t stop_listen(struct socket *socket)
 {
-    (void)socket;
+    tcp_accept(socket->impl, irqAcceptNull);
     return SOCKET_ERROR_UNKNOWN;
 }
 
@@ -141,7 +198,8 @@ static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
       e.i.d.domain = name;
   }
   sock->event = &e;
-  handler();
+  handler(&e);
+  sock->event = NULL;
 }
 
 static socket_error_t lwipv4_socket_resolve(struct socket *sock, const char *address)
@@ -154,7 +212,17 @@ static socket_error_t lwipv4_socket_resolve(struct socket *sock, const char *add
     }
     return lwipv4_socket_error_remap(err);
 }
-
+static void tcp_error_handler(void *arg, err_t err)
+{
+    struct socket *sock = (struct socket *) arg;
+    struct socket_event e;
+    handler_t h = sock->handler;
+    e.event = SOCKET_EVENT_ERROR;
+    e.i.e = lwipv4_socket_error_remap(err);
+    sock->event = &e; // TODO: (CThunk upgrade/Alpha3)
+    h(&e);
+    sock->event = NULL;
+}
 static socket_error_t lwipv4_socket_create(struct socket *sock, socket_proto_family_t family, socket_api_handler_t handler)
 {
     if (sock == NULL)
@@ -167,6 +235,7 @@ static socket_error_t lwipv4_socket_create(struct socket *sock, socket_proto_fam
             return SOCKET_ERROR_BAD_ALLOC;
         sock->stack = SOCKET_STACK_LWIP_IPV4;
         sock->impl = (void *)udp;
+        udp_recv((struct udp_pcb *)sock->impl, irqRecv, (void *)sock);
         break;
     }
     case SOCKET_STREAM:
@@ -175,8 +244,10 @@ static socket_error_t lwipv4_socket_create(struct socket *sock, socket_proto_fam
       tcp = tcp_new();
       if (tcp == NULL)
         return SOCKET_ERROR_BAD_ALLOC;
+      tcp_arg((struct tcp_pcb *)sock->impl, (void*) sock);
       sock->stack = SOCKET_STACK_LWIP_IPV4;
       sock->impl = (void *)tcp;
+      tcp_err(tcp, tcp_error_handler);
       break;
     }
     default:
@@ -226,7 +297,7 @@ static socket_error_t lwipv4_socket_destroy(struct socket *sock)
     return SOCKET_ERROR_NONE;
 }
 
-static err_t onConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
+static err_t irqConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
 {
     struct socket *sock = (struct socket *) arg;
     socket_api_handler_t handler = (socket_api_handler_t) sock->handler;
@@ -243,7 +314,8 @@ static err_t onConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
         sock->status |= SOCKET_STATUS_CONNECTED;
     }
     sock->event = &e;
-    handler();
+    handler(&e);
+    sock->event = NULL;
     return ERR_OK;
 }
 
@@ -255,8 +327,7 @@ static socket_error_t lwipv4_socket_connect(struct socket *sock, const struct so
         err = udp_connect((struct udp_pcb *)sock->impl, address->impl, port);
         break;
     case SOCKET_STREAM:
-        tcp_arg((struct tcp_pcb *)sock->impl, (void*) sock);
-        err = tcp_connect((struct tcp_pcb *)sock->impl, address->impl, port, onConnect);
+        err = tcp_connect((struct tcp_pcb *)sock->impl, address->impl, port, irqConnect);
         break;
     default:
         return SOCKET_ERROR_BAD_FAMILY;
@@ -293,6 +364,9 @@ static socket_error_t lwipv4_socket_bind(struct socket *sock, const struct socke
     default:
         return SOCKET_ERROR_BAD_FAMILY;
     }
+    if (err == ERR_OK) {
+        sock->status |= SOCKET_STATUS_BOUND;
+    }
     return lwipv4_socket_error_remap(err);
 }
 
@@ -305,30 +379,11 @@ static err_t tcp_sent_callback(void * arg, struct tcp_pcb *pcb, uint16_t len)
   e.event = SOCKET_EVENT_TX_DONE;
   e.i.t.sentbytes = len;
   e.i.t.sock = sock;
-  sock->event = &e; // TODO: (CThunk upgrade/Alpha2)
-  handler();
+  sock->event = &e; // TODO: (CThunk upgrade/Alpha3)
+  handler(&e);
+  sock->event = NULL;
   return ERR_OK;
 }
-
-// static err_t tcp_send_completion(void * arg, struct socket *sock, err_t err) {
-//     (void) sock;
-//   // if(err == ERR_OK) {
-//   //   sock->status = (socket_status_t)(SOCKET_STATUS_TX_BUSY|(int)sock->status);
-//   //   // Note: it looks like lwip sends do not require the buffer to persist.
-//   //   socket_api_handler handler = (socket_api_handler)sock->handler;
-//   //   socket_event_t e;
-//   //   e.event = SOCKET_EVENT_TX_DONE;
-//   //   e.i.t.free_buf = autofree;
-//   //   e.i.t.buf = buf;
-//   //   e.i.t.sock = sock;
-//   //   sock->event = &e; // TODO: (CThunk upgrade/Alpha2)
-//   //   handler();
-//   //   if (e.i.t.free_buf) {
-//   //     socket_buf_try_free(buf);
-//   //   }
-//   // }
-//   return lwipv4_socket_error_remap(err);
-// }
 
 static socket_error_t lwipv4_socket_start_send(struct socket *sock, struct socket_buffer *buf, void *arg)
 {
@@ -385,7 +440,8 @@ static socket_error_t lwipv4_socket_start_send(struct socket *sock, struct socke
         e.i.t.buf = buf;
         e.i.t.sock = sock;
         sock->event = &e; // TODO: (CThunk upgrade/Alpha2)
-        handler();
+        handler(&e);
+        sock->event = NULL;
         if (e.i.t.free_buf) {
             sock->api->buf_api.try_free(buf);
         }
@@ -418,7 +474,8 @@ static void recv_free(void *arg, struct udp_pcb *pcb, struct pbuf *p,
     s->status = (socket_status_t)((int)s->status & ~SOCKET_STATUS_RX_BUSY);
 
     s->event = &e; // TODO: (CThunk upgrade/Alpha3)
-    handler();
+    handler(&e);
+    s->event = NULL;
 
 
     if(e.i.r.free_buf) {
@@ -446,7 +503,8 @@ static err_t tcp_recv_free(void * arg, struct tcp_pcb * tpcb,
     s->status = (socket_status_t)((int)s->status & ~SOCKET_STATUS_RX_BUSY);
 
     s->event = &e; // TODO: (CThunk upgrade/Alpha3)
-    handler();
+    handler(&e);
+    s->event = NULL;
 
     tcp_recved(tpcb, s->api->buf_api.get_size(&e.i.r.buf));
     if(e.i.r.free_buf) {
@@ -510,35 +568,77 @@ static uint8_t lwipv4_socket_tx_is_busy(const struct socket *sock) {
 static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock) {
     return !!(sock->status & SOCKET_STATUS_RX_BUSY);
 }
+
+socket_error_t socket_send(struct socket *socket, void * buf, size_t *len)
+{
+	err_t err = ERR_VAL;
+	switch(socket->family) {
+    case SOCKET_DGRAM: {
+    	struct pbuf *pb = pbuf_alloc(PBUF_TRANSPORT,*len,SOCKET_ALLOC_POOL_BEST);
+    	err = pbuf_take(pb, buf, *len);
+    	if (err != ERR_OK) break;
+    	err = udp_send(socket->impl, pb);
+    	pbuf_free(pb);
+    	break;
+    }
+    case SOCKET_STREAM:
+    	break;
+	}
+	return lwipv4_socket_error_remap(err);
+}
+socket_error_t socket_send_to(struct socket *socket, void * buf, size_t *len, struct socket_addr *addr, const uint16_t port)
+{
+	err_t err = ERR_VAL;
+	switch(socket->family) {
+    case SOCKET_DGRAM: {
+    	struct pbuf *pb = pbuf_alloc(PBUF_TRANSPORT,*len,SOCKET_ALLOC_POOL_BEST);
+    	err = pbuf_take(pb, buf, *len);
+    	if (err != ERR_OK) break;
+    	err = udp_sendto(socket->impl, pb, addr->impl, port);
+    	pbuf_free(pb);
+    	break;
+    }
+    case SOCKET_STREAM:
+    	break;
+	}
+	return lwipv4_socket_error_remap(err);
+
+}
+typedef socket_error_t (*socket_recv)(struct socket *socket, void * buf, size_t *len);
+typedef socket_error_t (*socket_recv_from)(struct socket *socket, void * buf, size_t *len, struct socket_addr *addr, uint16_t *port);
+
+
+
+
 #include "lwip_socket_buffer.h"
 
 const struct socket_api lwipv4_socket_api = {
     .stack = SOCKET_STACK_LWIP_IPV4,
     .init = init,
-    .buf_api = {
-        //.stack_to_buf = ,
-        .get_ptr = lwip_buf_get_ptr,
-        .get_size = lwip_buf_get_size,
-        .alloc = lwip_buf_alloc,
-        .try_free = lwip_buf_try_free,
-        .free = lwip_buf_free,
-        .u2b = lwip_copy_from_user,
-        .b2u = lwip_copy_to_user,
-    },
+//    .buf_api = {
+//        //.stack_to_buf = ,
+//        .get_ptr = lwip_buf_get_ptr,
+//        .get_size = lwip_buf_get_size,
+//        .alloc = lwip_buf_alloc,
+//        .try_free = lwip_buf_try_free,
+//        .free = lwip_buf_free,
+//        .u2b = lwip_copy_from_user,
+//        .b2u = lwip_copy_to_user,
+//    },
     .create = lwipv4_socket_create,
     .destroy = lwipv4_socket_destroy,
     .close = lwipv4_socket_close,
-    .abort = lwipv4_socket_abort,
+//    .abort = lwipv4_socket_abort,
     .periodic_task = lwipv4_socket_periodic_task,
     .periodic_interval = lwipv4_socket_periodic_interval,
     .resolve = lwipv4_socket_resolve,
     .connect = lwipv4_socket_connect,
     .str2addr = str2addr,
     .bind = lwipv4_socket_bind,
-    .start_listen = start_listen,
-    .stop_listen = stop_listen,
-    .start_send = lwipv4_socket_start_send,
-    .start_recv = lwipv4_socket_start_recv,
+//    .start_listen = start_listen,
+//    .stop_listen = stop_listen,
+//    .start_send = lwipv4_socket_start_send,
+//    .start_recv = lwipv4_socket_start_recv,
     .is_connected = lwipv4_socket_is_connected,
     .is_bound = lwipv4_socket_is_bound,
     .tx_busy = lwipv4_socket_tx_is_busy,

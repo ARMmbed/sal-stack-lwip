@@ -46,6 +46,7 @@ void SysTick_Init(void) {
     if (SysTick_Config(SystemCoreClock / 1000)) {
         while (1);     /* Capture error */
     }
+	NVIC_SetVector(SysTick_IRQn,&SysTick_Handler);
 }
 
 /** \brief  SysTick IRQ handler and timebase management

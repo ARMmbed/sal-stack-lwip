@@ -34,6 +34,7 @@ static void irqUDPRecv(void * arg, struct udp_pcb * upcb,
         u16_t port);
 static err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb,
         struct pbuf * p, err_t err);
+static err_t irqTCPSent(void *arg,struct tcp_pcb *tpcb, uint16_t len);
 
 struct pbuf_wrapper {
 	struct pbuf_wrapper *next;
@@ -193,7 +194,6 @@ static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
       e.i.e = SOCKET_ERROR_DNS_FAILED;
   } else {
       e.event = SOCKET_EVENT_DNS;
-      e.i.d.sock = sock;
       e.i.d.addr.type = SOCKET_STACK_LWIP_IPV4;
       ipv4_addr_cpy(e.i.d.addr.storage, addr);
       e.i.d.domain = name;
@@ -245,13 +245,13 @@ static socket_error_t lwipv4_socket_create(struct socket *sock, const socket_add
     case SOCKET_STREAM:
     {
       struct tcp_pcb *tcp = tcp_new();
-      tcp = tcp_new();
       if (tcp == NULL)
         return SOCKET_ERROR_BAD_ALLOC;
-      tcp_arg((struct tcp_pcb *)sock->impl, (void*) sock);
-      sock->stack = SOCKET_STACK_LWIP_IPV4;
-      sock->impl = (void *)tcp;
+      tcp_arg(tcp, (void*) sock);
       tcp_err(tcp, tcp_error_handler);
+      tcp_sent(tcp,irqTCPSent);
+      sock->impl = (void *)tcp;
+      sock->stack = SOCKET_STACK_LWIP_IPV4;
       tcp_recv((struct tcp_pcb *)sock->impl, irqTCPRecv);
       break;
     }
@@ -309,6 +309,9 @@ static socket_error_t lwipv4_socket_destroy(struct socket *sock)
 		pbuf_free(pw->p);
 		free(pw);
 		pw = next_pw;
+	}
+	if (sock->impl == NULL) {
+		return SOCKET_ERROR_NULL_PTR;
 	}
 
     lwipv4_socket_abort(sock);
@@ -388,18 +391,11 @@ static socket_error_t lwipv4_socket_bind(struct socket *sock, const struct socke
     return lwipv4_socket_error_remap(err);
 }
 
-void irqUDPRecv(void * arg, struct udp_pcb * upcb,
-        struct pbuf * p,
-        struct ip_addr * addr,
-        u16_t port)
-{
-	(void) upcb;
-	struct socket *s = (struct socket *) arg;
-	struct pbuf_wrapper *w;
-	struct pbuf_wrapper *new_wrap = NULL;
+static struct pbuf_wrapper * rx_core(struct socket * s, struct pbuf *p) {
 	struct socket_event e;
+	struct pbuf_wrapper *w;
+	struct pbuf_wrapper *new_wrap;
 
-	__disable_irq();
 	new_wrap = malloc(sizeof(struct pbuf_wrapper));
 	if (new_wrap == NULL) {
 		e.event = SOCKET_EVENT_ERROR;
@@ -407,11 +403,10 @@ void irqUDPRecv(void * arg, struct udp_pcb * upcb,
 		s->event = &e;
 		((socket_api_handler_t)(s->handler))();
 		s->event = NULL;
-		return;
+		return NULL;
 	}
+	__disable_irq();
 	new_wrap->next = NULL;
-	new_wrap->addr = addr;
-	new_wrap->port = port;
 	new_wrap->p = p;
 	new_wrap->offset = 0;
 
@@ -424,20 +419,38 @@ void irqUDPRecv(void * arg, struct udp_pcb * upcb,
 		}
 		w->next = new_wrap;
 	}
+	__enable_irq();
+	return new_wrap;
+}
+
+void irqUDPRecv(void * arg, struct udp_pcb * upcb,
+        struct pbuf * p,
+        struct ip_addr * addr,
+        u16_t port)
+{
+	(void) upcb;
+	struct socket *s = (struct socket *) arg;
+	struct pbuf_wrapper *w;
+	struct socket_event e;
+
+	w = rx_core(s, p);
+	if(w == NULL) {
+		return;
+	}
+	w->addr = addr;
+	w->port = port;
 
 	e.event = SOCKET_EVENT_RX_DONE;
 	s->event = &e;
 	((socket_api_handler_t)(s->handler))();
 	s->event = NULL;
-	__enable_irq();
 }
 
 err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb,
         struct pbuf * p, err_t err) {
 	(void) tpcb;
 	struct socket *s = (struct socket *) arg;
-	struct pbuf_wrapper *w = (struct pbuf_wrapper *)s->rxBufChain;
-	struct pbuf_wrapper *new_wrap = NULL;
+	struct pbuf_wrapper *w;
 	struct socket_event e;
 
 	if(err != ERR_OK) {
@@ -449,23 +462,11 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb,
 		return ERR_OK;
 	}
 
-	while (w->next != NULL) {
-		w = w->next;
+	w = rx_core(s, p);
+	if(w == NULL) {
+		tcp_abort(tpcb);
+		return ERR_ABRT;
 	}
-	new_wrap = malloc(sizeof(struct pbuf_wrapper));
-	if (new_wrap == NULL) {
-		e.event = SOCKET_EVENT_ERROR;
-		e.i.e = SOCKET_ERROR_BAD_ALLOC;
-		s->event = &e;
-		((socket_api_handler_t)(s->handler))();
-		s->event = NULL;
-		return ERR_OK;
-	}
-	w->next = new_wrap;
-	w = w->next;
-	w->p = p;
-	w->offset = 0;
-	w->next = NULL;
 
 	e.event = SOCKET_EVENT_RX_DONE;
 	s->event = &e;
@@ -473,28 +474,6 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb,
 	s->event = NULL;
 	return ERR_OK;
 }
-
-//static socket_error_t lwipv4_socket_start_recv(struct socket *sock) {
-//    err_t err = ERR_OK;
-//
-//    if (lwipv4_socket_rx_is_busy(sock)) return SOCKET_ERROR_BUSY;
-//    switch (sock->family) {
-//    case SOCKET_DGRAM:
-//        sock->status = (socket_status_t)((int)sock->status | SOCKET_STATUS_RX_BUSY);
-//        udp_recv((struct udp_pcb *)sock->impl, recv_free, (void *)sock);
-//        break;
-//    case SOCKET_STREAM:
-//        sock->status = (socket_status_t)((int)sock->status | SOCKET_STATUS_RX_BUSY);
-//        tcp_recv((struct tcp_pcb *)sock->impl, tcp_recv_free);
-//        break;
-//    default:
-//        return SOCKET_ERROR_BAD_FAMILY;
-//    }
-//    if(err == ERR_OK)
-//        sock->status = (socket_status_t)((int)sock->status | SOCKET_STATUS_RX_BUSY);
-//    return lwipv4_socket_error_remap(err);
-//
-//}
 
 static uint8_t lwipv4_socket_is_connected(const struct socket *sock) {
     switch (sock->family) {
@@ -530,19 +509,44 @@ static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock) {
     return !!(sock->status & SOCKET_STATUS_RX_BUSY);
 }
 
+err_t irqTCPSent(void *arg,struct tcp_pcb *tpcb, uint16_t len) {
+	// Notify the application that some bytes have been received by the remote host
+	(void) tpcb;
+	socket_event_t e;
+	struct socket * s = (struct socket *)arg;
+	socket_api_handler_t handler = s->handler;
+	e.event = SOCKET_EVENT_TX_DONE;
+	e.sock = s;
+	e.i.t.sentbytes = len;
+	s->event = &e;
+	handler();
+	s->event = NULL;
+	return SOCKET_ERROR_NONE;
+}
+
 socket_error_t lwipv4_socket_send(struct socket *socket, const void * buf, const size_t len)
 {
 	err_t err = ERR_VAL;
 	switch(socket->family) {
     case SOCKET_DGRAM: {
     	struct pbuf *pb = pbuf_alloc(PBUF_TRANSPORT,len,PBUF_RAM);
+    	socket_event_t e;
+    	socket_api_handler_t handler = socket->handler;
     	err = pbuf_take(pb, buf, len);
     	if (err != ERR_OK) break;
     	err = udp_send(socket->impl, pb);
     	pbuf_free(pb);
+    	//Notify the application that the transfer is queued at the MAC layer
+    	e.event = SOCKET_EVENT_TX_DONE;
+    	e.sock = socket;
+    	e.i.t.sentbytes = len;
+    	socket->event = &e;
+    	handler();
+    	socket->event = NULL;
     	break;
     }
     case SOCKET_STREAM:
+    	err = tcp_write(socket->impl,buf,len,TCP_WRITE_FLAG_COPY);
     	break;
 	}
 	return lwipv4_socket_error_remap(err);
@@ -560,6 +564,7 @@ socket_error_t lwipv4_socket_send_to(struct socket *socket, const void * buf, co
     	break;
     }
     case SOCKET_STREAM:
+    	err = ERR_USE;
     	break;
 	}
 	return lwipv4_socket_error_remap(err);
@@ -594,8 +599,6 @@ static socket_error_t recv_copy_free(struct socket *socket, void * buf,
 	if (socket->family ==  SOCKET_STREAM ) {
 		tcp_recved(socket->impl, copied);
 	}
-
-	//TODO: free up to n bytes
 
 	if(copied + pw->offset >= pw->p->len) {
 		socket->rxBufChain = pw->next;
@@ -651,10 +654,6 @@ socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t
 	err = recv_copy_free(socket, buf, len);
 	return err;
 }
-
-
-
-
 
 const struct socket_api lwipv4_socket_api = {
     .stack = SOCKET_STACK_LWIP_IPV4,

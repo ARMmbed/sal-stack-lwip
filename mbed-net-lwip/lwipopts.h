@@ -22,7 +22,7 @@
 #include "lwipopts_conf.h"
 
 // Operating System
-#define NO_SYS                      1
+#define NO_SYS 1
 
 #if NO_SYS == 0
 #include "cmsis_os.h"
@@ -83,7 +83,7 @@
 // Debug Options
 // #define LWIP_DEBUG
 #define UDP_LPC_EMAC                LWIP_DBG_ON
-#define SYS_DEBUG                   LWIP_DBG_ON
+#define SYS_DEBUG                   LWIP_DBG_OFF
 #define PPP_DEBUG                   LWIP_DBG_OFF
 #define IP_DEBUG                    LWIP_DBG_ON
 #define MEM_DEBUG                   LWIP_DBG_OFF
@@ -102,9 +102,9 @@
 #define TCP_OUTPUT_DEBUG            LWIP_DBG_OFF
 #define TCP_RST_DEBUG               LWIP_DBG_OFF
 #define TCP_QLEN_DEBUG              LWIP_DBG_OFF
-#define ETHARP_DEBUG                LWIP_DBG_ON
-#define NETIF_DEBUG                 LWIP_DBG_ON
-#define DHCP_DEBUG                  LWIP_DBG_ON
+#define ETHARP_DEBUG                LWIP_DBG_OFF
+#define NETIF_DEBUG                 LWIP_DBG_OFF
+#define DHCP_DEBUG                  LWIP_DBG_OFF
 
 #ifdef LWIP_DEBUG
 #define MEMP_OVERFLOW_CHECK         1

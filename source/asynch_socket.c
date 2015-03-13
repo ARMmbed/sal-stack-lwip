@@ -3,13 +3,19 @@
  * Copyright 2015 ARM Holdings PLC
  */
 
+/**
+ * \file asynch_socket.c
+ * \brief The LwIP implementation of the abstract C socket API.
+ * This file implements LwIP's Socket Abstraction Layer.  Some compromises were necessary
+ * to make LwIP fit the model of the SAL.  In particular, receive causes a heap allocation
+ * to obtain the pbuf wrapper so that receive pbufs can be chained together with source
+ * information.
+ */
 #include <stddef.h>
 #include <stdint.h>
 
-#include "socket_api.h"
-#include "socket_buffer.h"
+#include <mbed-net-socket-abstract/socket_api.h>
 
-// TODO: Remove when yotta supports init
 #include "lwipv4_init.h"
 
 #include "lwip/netif.h"
@@ -21,20 +27,51 @@
 #include "lwip/dns.h"
 #include "lwip/ip_addr.h"
 
-
-
-uint32_t TCPSockets = 0;
-
+/** Forward declaration of the socket api */
 const struct socket_api lwipv4_socket_api;
-static uint8_t lwipv4_socket_tx_is_busy(const struct socket *sock);
-static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock);
+/**
+ * \defgroup lwip_utility_functions Utility Functions
+ * @{
+ */
+/**
+ * Interrupt handler for UDP receive events
+ * @param arg user supplied argument (udp_pcb.recv_arg)
+ * @param pcb the udp_pcb which received data
+ * @param p the packet buffer that was received
+ * @param addr the remote IP address from which the packet was received
+ * @param port the remote port from which the packet was received
+ */
 static void irqUDPRecv(void * arg, struct udp_pcb * upcb,
         struct pbuf * p,
         struct ip_addr * addr,
         u16_t port);
+/**
+ *
+ * @param arg Additional argument to pass to the callback function (@see tcp_arg())
+ * @param tpcb The connection pcb which received data
+ * @param p The received data (or NULL when the connection has been closed!)
+ * @param err An error code if there has been an error receiving
+ *            Only return ERR_ABRT if you have called tcp_abort from within the
+ *            callback function!
+
+ * @return
+ */
 static err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb,
         struct pbuf * p, err_t err);
+/**
+ * Interrupt handler for TCP Receive
+ * @param arg Additional argument to pass to the callback function (@see tcp_arg())
+ * @param tpcb The connection pcb for which data has been acknowledged
+ * @param len The amount of bytes acknowledged
+ * @return ERR_OK: try to send some data by calling tcp_output
+ *            Only return ERR_ABRT if you have called tcp_abort from within the
+ *            callback function!
+ */
 static err_t irqTCPSent(void *arg,struct tcp_pcb *tpcb, uint16_t len);
+
+/**
+ * @}
+ */
 
 struct pbuf_wrapper {
 	struct pbuf_wrapper *next;
@@ -91,75 +128,6 @@ static socket_error_t init()
     return SOCKET_ERROR_NONE;
 }
 
-//static err_t irqAccept (void * arg, struct tcp_pcb * newpcb, err_t err)
-//{
-//	struct socket * s = (struct socket *)arg;
-//    socket_event_t e;
-//    if (err != ERR_OK) {
-//        e.event = SOCKET_EVENT_ERROR;
-//        e.i.e = lwipv4_socket_error_remap(err);
-//        err = ERR_OK;
-//        s->event = &e;
-//        handler(&e);
-//        s->event = NULL;
-//    } else {
-//        handler_t handler = s->handler;
-//        e.event = SOCKET_EVENT_ACCEPT;
-//        e.i.a.sock = s;
-//        e.i.a.newimpl = newpcb;
-//        e.i.a.reject = 0;
-//        s->event = &e;
-//        handler(&e);
-//        s->event = NULL;
-//        if (e.i.a.reject) {
-//            err = ERR_ABRT;
-//            tcp_abort(newpcb);
-//        }
-//    }
-//    return err;
-//}
-//static err_t irqAcceptNull (void * arg, struct tcp_pcb * newpcb, err_t err)
-//{
-//    (void) arg;
-//    (void) err;
-//    tcp_abort(newpcb);
-//    return ERR_ABRT;
-//}
-//static socket_error_t start_listen(struct socket *socket)
-//{
-//    struct tcp_pcb * pcb = socket->impl;
-//    if (pcb->state != LISTEN) {
-//        socket->impl = tcp_listen(socket->impl);
-//        if (socket->impl == NULL) {
-//            return SOCKET_ERROR_BAD_ALLOC;
-//        }
-//    }
-//    tcp_arg(socket->impl, socket);
-//    tcp_accept(socket->impl, irqAccept);
-//    return SOCKET_ERROR_NONE;
-//}
-//static socket_error_t stop_listen(struct socket *socket)
-//{
-//    tcp_accept(socket->impl, irqAcceptNull);
-//    return SOCKET_ERROR_UNKNOWN;
-//}
-
-//static uint8_t family_remap(socket_proto_family_t family) {
-//    uint8_t lwip_family = 0;
-//    switch (family) {
-//    case SOCKET_DGRAM:
-//        lwip_family = SOCK_DGRAM;
-//        break;
-//    case SOCKET_STREAM:
-//        lwip_family = SOCK_STREAM;
-//        break;
-//    case SOCKET_RAW:
-//        lwip_family = SOCK_RAW;
-//        break;
-//    }
-//    return lwip_family;
-//}
-
 
 static socket_api_handler_t lwipv4_socket_periodic_task(const struct socket * sock)
 {
@@ -183,7 +151,6 @@ static uint32_t lwipv4_socket_periodic_interval(const struct socket * sock)
     }
     return 0;
 }
-
 
 static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
   struct socket *sock = (struct socket *)arg;
@@ -211,8 +178,8 @@ static socket_error_t lwipv4_socket_resolve(struct socket *sock, const char *add
     if (err == ERR_OK) {
         dnscb(address, &ia, sock);
     }
-    if (err == SOCKET_ERROR_BUSY)
-    	err = SOCKET_ERROR_NONE;
+    if (err == ERR_INPROGRESS)
+    	err = ERR_OK;
     return lwipv4_socket_error_remap(err);
 }
 static void tcp_error_handler(void *arg, err_t err)
@@ -222,7 +189,7 @@ static void tcp_error_handler(void *arg, err_t err)
     socket_api_handler_t h = sock->handler;
     e.event = SOCKET_EVENT_ERROR;
     e.i.e = lwipv4_socket_error_remap(err);
-    sock->event = &e; // TODO: (CThunk upgrade/Alpha3)
+    sock->event = &e;
     h();
     sock->event = NULL;
 }
@@ -491,11 +458,9 @@ static uint8_t lwipv4_socket_is_connected(const struct socket *sock) {
 static uint8_t lwipv4_socket_is_bound(const struct socket *sock) {
     switch (sock->family) {
     case SOCKET_DGRAM:
-        if (((struct udp_pcb *)sock->impl)->local_port != 0)
-            return 1;
-        return 0;
+        return (((struct udp_pcb *)sock->impl)->local_port != 0);
     case SOCKET_STREAM:
-        //TODO: TCP is bound
+        return (((struct tcp_pcb *)sock->impl)->local_port != 0);
     default:
         break;
     }

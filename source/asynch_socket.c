@@ -351,6 +351,61 @@ static socket_error_t str2addr(const struct socket *sock, struct socket_addr *ad
     return err;
 }
 
+static err_t irqAccept (void * arg, struct tcp_pcb * newpcb, err_t err)
+{
+    struct socket * s = (struct socket *)arg;
+    struct socket_event e;
+    socket_api_handler_t handler = s->handler;
+    if (err != ERR_OK) {
+        e.event = SOCKET_EVENT_ERROR;
+        e.i.e = lwipv4_socket_error_remap(err);
+        err = ERR_OK;
+        s->event = &e;
+        handler();
+        s->event = NULL;
+    } else {
+        socket_api_handler_t handler = s->handler;
+        e.event = SOCKET_EVENT_ACCEPT;
+        e.sock = s;
+        e.i.a.newimpl = newpcb;
+        e.i.a.reject = 0;
+        s->event = &e;
+        handler();
+        s->event = NULL;
+        if (e.i.a.reject) {
+            err = ERR_ABRT;
+            tcp_abort(newpcb);
+        }
+    }
+    return err;
+}
+static err_t irqAcceptNull (void * arg, struct tcp_pcb * newpcb, err_t err)
+{
+    (void) arg;
+    (void) err;
+    tcp_abort(newpcb);
+    return ERR_ABRT;
+}
+static socket_error_t start_listen(struct socket *socket, uint32_t backlog)
+{
+    struct tcp_pcb * pcb = socket->impl;
+    if (pcb->state != LISTEN) {
+        socket->impl = tcp_listen(socket->impl);
+        if (socket->impl == NULL) {
+            return SOCKET_ERROR_BAD_ALLOC;
+        }
+    }
+    tcp_arg(socket->impl, socket);
+    tcp_accept(socket->impl, irqAccept);
+    return SOCKET_ERROR_NONE;
+}
+static socket_error_t stop_listen(struct socket *socket)
+{
+    tcp_accept(socket->impl, irqAcceptNull);
+    return SOCKET_ERROR_UNKNOWN;
+}
+
+
 static socket_error_t lwipv4_socket_bind(struct socket *sock, const struct socket_addr *address, const uint16_t port)
 {
     err_t err = ERR_OK;
@@ -548,7 +603,6 @@ socket_error_t lwipv4_socket_send_to(struct socket *socket, const void * buf, co
 
 }
 
-
 static socket_error_t recv_validate(struct socket *socket, void * buf, size_t *len) {
 	if(socket == NULL || len == NULL || buf == NULL || socket->impl == NULL) {
 		return SOCKET_ERROR_NULL_PTR;
@@ -655,8 +709,8 @@ const struct socket_api lwipv4_socket_api = {
     .connect = lwipv4_socket_connect,
     .str2addr = str2addr,
     .bind = lwipv4_socket_bind,
-//    .start_listen = start_listen,
-//    .stop_listen = stop_listen,
+    .start_listen = start_listen,
+    .stop_listen = stop_listen,
 //    .start_send = lwipv4_socket_start_send,
 //    .start_recv = lwipv4_socket_start_recv,
     .send = lwipv4_socket_send,
@@ -667,5 +721,4 @@ const struct socket_api lwipv4_socket_api = {
     .is_bound = lwipv4_socket_is_bound,
     .tx_busy = lwipv4_socket_tx_is_busy,
     .rx_busy = lwipv4_socket_rx_is_busy,
-    .pbuf_type = SOCKET_BUFFER_LWIP_PBUF,
 };

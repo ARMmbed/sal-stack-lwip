@@ -23,13 +23,13 @@
     "mbed-net-lwip/lwip/include/netif"
   ],
   "dependencies": {
-    "mbed": "ARMmbed/mbed-sdk"
-    ,    "mbed-net-socket-abstract" : "ARMmbed/mbed-net-socket-abstract"
+    "mbed": "ARMmbed/mbed-sdk-private",
+    "mbed-net-socket-abstract" : "ARMmbed/mbed-net-socket-abstract#~0.0.1"
   },
   "targetDependencies": {
     "lwip-k64f":{
-      "mbed-net-lwip-k64f":"ARMmbed/mbed-net-lwip-k64f",
-      "mbed-net-lwip-eth" : "ARMmbed/mbed-net-lwip-eth#master"
+      "mbed-net-lwip-k64f":"ARMmbed/mbed-net-lwip-k64f#~0.0.1",
+      "mbed-net-lwip-eth" : "ARMmbed/mbed-net-lwip-eth#~0.0.1"
     }
   }
 }

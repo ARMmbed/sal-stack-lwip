@@ -12,6 +12,10 @@
     {
       "url": "http://lwip.wikia.com/wiki/License",
       "type": "BSD"
+    },
+    {
+      "url": "http://www.apache.org/licenses/LICENSE-2.0",
+      "type": "apache 2.0"
     }
   ],
   "extraIncludes": [

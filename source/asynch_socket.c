@@ -278,22 +278,20 @@ static void lwipv4_socket_abort(struct socket *sock)
 }
 static socket_error_t lwipv4_socket_destroy(struct socket *sock)
 {
-	struct pbuf_wrapper * pw;
-	if (sock == NULL) {
-		return SOCKET_ERROR_NULL_PTR;
-	}
-	pw = (struct pbuf_wrapper *) sock->rxBufChain;
-	while (pw != NULL) {
-		struct pbuf_wrapper * next_pw = pw->next;
-		pbuf_free(pw->p);
-		free(pw);
-		pw = next_pw;
-	}
-	if (sock->impl == NULL) {
-		return SOCKET_ERROR_NULL_PTR;
-	}
-
-    lwipv4_socket_abort(sock);
+    struct pbuf_wrapper * pw;
+    if (sock == NULL) {
+        return SOCKET_ERROR_NULL_PTR;
+    }
+    pw = (struct pbuf_wrapper *) sock->rxBufChain;
+    while (pw != NULL) {
+        struct pbuf_wrapper * next_pw = pw->next;
+        pbuf_free(pw->p);
+        free(pw);
+        pw = next_pw;
+    }
+    if (sock->impl != NULL) {
+        lwipv4_socket_abort(sock);
+    }
     return SOCKET_ERROR_NONE;
 }
 

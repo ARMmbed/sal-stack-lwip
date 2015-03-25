@@ -8,6 +8,7 @@
 #ifdef __cplusplus
 extern "C"
 #endif
+#include <mbed-net-socket-abstract/socket_types.h>
 socket_error_t lwipv4_socket_init();
 
 #endif // MBED_LWIPV4_INIT_H_

@@ -207,7 +207,12 @@ static void tcp_error_handler(void *arg, err_t err)
 }
 static socket_error_t lwipv4_socket_create(struct socket *sock, const socket_address_family_t af, const socket_proto_family_t pf, socket_api_handler_t const handler)
 {
-	(void)af;
+    switch (af) {
+        case SOCKET_AF_INET4:
+            break;
+        default:
+            return SOCKET_ERROR_BAD_FAMILY;
+    }
     if (sock == NULL)
         return SOCKET_ERROR_NULL_PTR;
     switch (pf) {

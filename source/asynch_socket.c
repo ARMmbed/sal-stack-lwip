@@ -39,6 +39,8 @@
 #include "lwip/dns.h"
 #include "lwip/ip_addr.h"
 
+
+static uint8_t lwipv4_socket_is_connected(const struct socket *sock);
 /** Forward declaration of the socket api */
 const struct socket_api lwipv4_socket_api;
 /**
@@ -290,7 +292,11 @@ static socket_error_t lwipv4_socket_destroy(struct socket *sock)
         pw = next_pw;
     }
     if (sock->impl != NULL) {
-        lwipv4_socket_abort(sock);
+        if (lwipv4_socket_is_connected(sock)) {
+            lwipv4_socket_close(sock);
+        } else {
+            lwipv4_socket_abort(sock);
+        }
     }
     return SOCKET_ERROR_NONE;
 }
@@ -438,7 +444,14 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb,
 		s->event = NULL;
 		return ERR_OK;
 	}
-
+    /* Check for a disconnect */
+    if (p == NULL) {
+        e.event = SOCKET_EVENT_DISCONNECT;
+        s->event = &e;
+        ((socket_api_handler_t) (s->handler))();
+        s->event = NULL;
+        return ERR_OK;
+    }
 	w = rx_core(s, p);
 	if(w == NULL) {
 		tcp_abort(tpcb);
@@ -452,7 +465,7 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb,
 	return ERR_OK;
 }
 
-static uint8_t lwipv4_socket_is_connected(const struct socket *sock) {
+uint8_t lwipv4_socket_is_connected(const struct socket *sock) {
     switch (sock->family) {
     case SOCKET_DGRAM:
         if (((struct udp_pcb *)sock->impl)->flags & UDP_FLAGS_CONNECTED)

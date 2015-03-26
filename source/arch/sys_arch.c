@@ -37,7 +37,7 @@
 static volatile u32_t systick_timems;
 
 extern void eth_arch_timer_callback(void);
-
+static void SysTick_Handler(void);
 // TODO: this uses 32-bit values to keep time, might want to consider switching to 64 bits
 // TODO: (unless lwIP handles timer overflows internally)
 
@@ -46,6 +46,7 @@ void SysTick_Init(void) {
     if (SysTick_Config(SystemCoreClock / 1000)) {
         while (1);     /* Capture error */
     }
+	NVIC_SetVector(SysTick_IRQn,&SysTick_Handler);
 }
 
 /** \brief  SysTick IRQ handler and timebase management

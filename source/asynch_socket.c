@@ -213,7 +213,7 @@ static socket_error_t lwipv4_socket_create(struct socket *sock, const socket_add
         default:
             return SOCKET_ERROR_BAD_FAMILY;
     }
-    if (sock == NULL)
+    if (sock == NULL || handler == NULL)
         return SOCKET_ERROR_NULL_PTR;
     switch (pf) {
     case SOCKET_DGRAM:

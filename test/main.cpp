@@ -20,6 +20,8 @@
 #include <mbed-net-lwip/lwipv4_init.h>
 #include <mbed-net-lwip-eth/EthernetInterface.h>
 
+#define TEST_SERVER "192.168.2.1"
+#define TEST_PORT0 32767
 
 int main ()
 {
@@ -38,8 +40,15 @@ int main ()
         }
         rc = socket_api_test_create_destroy(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET6);
         tests_pass = tests_pass && rc;
+
+        rc = socket_api_test_socket_str2addr(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET6);
+        tests_pass = tests_pass && rc;
         // Need create/destroy for all subsequent tests
-       if (!tests_pass) break;
+        // str2addr is required for connect test
+        if (!tests_pass) break;
+
+        rc = socket_api_test_connect_close(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET6,TEST_SERVER, TEST_PORT0);
+        tests_pass = tests_pass && rc;
 
 
     } while (0);

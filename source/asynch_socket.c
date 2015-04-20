@@ -39,6 +39,8 @@
 #include "lwip/dns.h"
 #include "lwip/ip_addr.h"
 
+
+static uint8_t lwipv4_socket_is_connected(const struct socket *sock);
 /** Forward declaration of the socket api */
 const struct socket_api lwipv4_socket_api;
 /**
@@ -302,22 +304,24 @@ static void lwipv4_socket_abort(struct socket *sock)
 }
 static socket_error_t lwipv4_socket_destroy(struct socket *sock)
 {
-	struct pbuf_wrapper * pw;
-	if (sock == NULL) {
-		return SOCKET_ERROR_NULL_PTR;
-	}
-	pw = (struct pbuf_wrapper *) sock->rxBufChain;
-	while (pw != NULL) {
-		struct pbuf_wrapper * next_pw = pw->next;
-		pbuf_free(pw->p);
-		free(pw);
-		pw = next_pw;
-	}
-	if (sock->impl == NULL) {
-		return SOCKET_ERROR_NULL_PTR;
-	}
-
-    lwipv4_socket_abort(sock);
+    struct pbuf_wrapper * pw;
+    if (sock == NULL) {
+        return SOCKET_ERROR_NULL_PTR;
+    }
+    pw = (struct pbuf_wrapper *) sock->rxBufChain;
+    while (pw != NULL) {
+        struct pbuf_wrapper * next_pw = pw->next;
+        pbuf_free(pw->p);
+        free(pw);
+        pw = next_pw;
+    }
+    if (sock->impl != NULL) {
+        if (lwipv4_socket_is_connected(sock)) {
+            lwipv4_socket_close(sock);
+        } else {
+            lwipv4_socket_abort(sock);
+        }
+    }
     return SOCKET_ERROR_NONE;
 }
 
@@ -485,22 +489,22 @@ void irqUDPRecv(void * arg, struct udp_pcb * upcb,
         struct ip_addr * addr,
         u16_t port)
 {
-    (void) upcb;
-    struct socket *s = (struct socket *) arg;
-    struct pbuf_wrapper *w;
-    struct socket_event e;
+	(void) upcb;
+	struct socket *s = (struct socket *) arg;
+	struct pbuf_wrapper *w;
+	struct socket_event e;
 
-    w = rx_core(s, p);
-    if (w == NULL) {
-        return;
-    }
-    w->addr = addr;
-    w->port = port;
+	w = rx_core(s, p);
+	if(w == NULL) {
+		return;
+	}
+	w->addr = addr;
+	w->port = port;
 
-    e.event = SOCKET_EVENT_RX_DONE;
-    s->event = &e;
-    ((socket_api_handler_t) (s->handler))();
-    s->event = NULL;
+	e.event = SOCKET_EVENT_RX_DONE;
+	s->event = &e;
+	((socket_api_handler_t)(s->handler))();
+	s->event = NULL;
 }
 
 err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
@@ -510,15 +514,15 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
     struct pbuf_wrapper *w;
     struct socket_event e;
 
-    if (err != ERR_OK) {
-        e.event = SOCKET_EVENT_ERROR;
-        e.i.e = lwipv4_socket_error_remap(err);
-        s->event = &e;
-        ((socket_api_handler_t) (s->handler))();
-        s->event = NULL;
-        return ERR_OK;
-    }
-    // Check for a disconnect
+	if(err != ERR_OK) {
+		e.event = SOCKET_EVENT_ERROR;
+		e.i.e = lwipv4_socket_error_remap(err);
+		s->event = &e;
+		((socket_api_handler_t)(s->handler))();
+		s->event = NULL;
+		return ERR_OK;
+	}
+    /* Check for a disconnect */
     if (p == NULL) {
         e.event = SOCKET_EVENT_DISCONNECT;
         s->event = &e;
@@ -526,18 +530,17 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
         s->event = NULL;
         return ERR_OK;
     }
+	w = rx_core(s, p);
+	if(w == NULL) {
+		tcp_abort(tpcb);
+		return ERR_ABRT;
+	}
 
-    w = rx_core(s, p);
-    if (w == NULL) {
-        tcp_abort(tpcb);
-        return ERR_ABRT;
-    }
-
-    e.event = SOCKET_EVENT_RX_DONE;
-    s->event = &e;
-    ((socket_api_handler_t) (s->handler))();
-    s->event = NULL;
-    return ERR_OK;
+	e.event = SOCKET_EVENT_RX_DONE;
+	s->event = &e;
+	((socket_api_handler_t)(s->handler))();
+	s->event = NULL;
+	return ERR_OK;
 }
 
 static uint8_t lwipv4_socket_is_connected(const struct socket *sock) {

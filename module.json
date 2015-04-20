@@ -1,6 +1,6 @@
 {
   "name": "mbed-net-lwip",
-  "version": "0.0.3",
+  "version": "0.1.1",
   "description": "Lightweight IP",
   "keywords": [
     "lwip",
@@ -28,7 +28,7 @@
   ],
   "dependencies": {
     "mbed": "ARMmbed/mbed-sdk-private",
-    "mbed-net-socket-abstract": "ARMmbed/mbed-net-socket-abstract#~0.0.3"
+    "mbed-net-socket-abstract": "ARMmbed/mbed-net-socket-abstract#~0.1.1"
   },
   "targetDependencies": {
     "lwip-k64f": {

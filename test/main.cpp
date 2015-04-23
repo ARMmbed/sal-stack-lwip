@@ -22,6 +22,7 @@
 
 #define TEST_SERVER "192.168.2.1"
 #define TEST_PORT0 32767
+#define TEST_PORT1 32766
 
 int main ()
 {
@@ -48,6 +49,15 @@ int main ()
         if (!tests_pass) break;
 
         rc = socket_api_test_connect_close(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET6,TEST_SERVER, TEST_PORT0);
+        tests_pass = tests_pass && rc;
+
+        rc = socket_api_test_echo_client_connected(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, SOCKET_STREAM, true, TEST_SERVER, TEST_PORT0);
+        tests_pass = tests_pass && rc;
+
+        rc = socket_api_test_echo_client_connected(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, SOCKET_DGRAM, true, TEST_SERVER, TEST_PORT1);
+        tests_pass = tests_pass && rc;
+
+        rc = socket_api_test_echo_client_connected(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, SOCKET_DGRAM, false, TEST_SERVER, TEST_PORT1);
         tests_pass = tests_pass && rc;
 
 

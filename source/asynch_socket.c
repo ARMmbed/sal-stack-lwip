@@ -90,7 +90,7 @@ static err_t irqTCPSent(void *arg,struct tcp_pcb *tpcb, uint16_t len);
 struct pbuf_wrapper {
     struct pbuf_wrapper *next;
     struct pbuf *p;
-    struct ip_addr *addr;
+    struct ip_addr addr;
     size_t offset;
     uint16_t port;
 };
@@ -503,7 +503,7 @@ void irqUDPRecv(void * arg, struct udp_pcb * upcb,
     if(w == NULL) {
         return;
     }
-    w->addr = addr;
+    w->addr = *addr;
     w->port = port;
 
     e.event = SOCKET_EVENT_RX_DONE;
@@ -632,10 +632,18 @@ socket_error_t lwipv4_socket_send_to(struct socket *socket, const void * buf, co
     switch(socket->family) {
     case SOCKET_DGRAM: {
         struct pbuf *pb = pbuf_alloc(PBUF_TRANSPORT,len,PBUF_RAM);
+        socket_event_t e;
+        socket_api_handler_t handler = socket->handler;
         err = pbuf_take(pb, buf, len);
         if (err != ERR_OK) break;
         err = udp_sendto(socket->impl, pb, (void *)addr->storage, port);
         pbuf_free(pb);
+        e.event = SOCKET_EVENT_TX_DONE;
+        e.sock = socket;
+        e.i.t.sentbytes = len;
+        socket->event = &e;
+        handler();
+        socket->event = NULL;
         break;
     }
     case SOCKET_STREAM:
@@ -722,8 +730,9 @@ socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t
         }
     } else if (socket->family == SOCKET_DGRAM) {
         struct pbuf_wrapper * pw = (struct pbuf_wrapper *)socket->rxBufChain;
-        *ia = *pw->addr;
+        *ia = pw->addr;
         *port = pw->port;
+        addr->type = SOCKET_STACK_LWIP_IPV4;
     }
     err = recv_copy_free(socket, buf, len);
     return err;

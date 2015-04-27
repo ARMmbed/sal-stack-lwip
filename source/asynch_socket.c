@@ -659,9 +659,10 @@ static socket_error_t recv_copy_free(struct socket *socket, void * buf,
         size_t *len) {
     struct pbuf_wrapper * pw = (struct pbuf_wrapper *) socket->rxBufChain;
     size_t copied;
-    size_t cplen = ((*len) < (pw->p->len) ? (*len) : (pw->p->len));
+    size_t cplen = pw->p->len - pw->offset;
+    cplen = ((*len) < (cplen) ? (*len) : (cplen));
 
-    copied = pbuf_copy_partial(pw->p, buf, cplen, 0);
+    copied = pbuf_copy_partial(pw->p, buf, cplen, pw->offset);
     if (!copied) {
         return SOCKET_ERROR_SIZE;
     }

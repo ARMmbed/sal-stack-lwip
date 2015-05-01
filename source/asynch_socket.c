@@ -640,9 +640,12 @@ socket_error_t lwipv4_socket_send_to(struct socket *socket, const void * buf, co
         socket_event_t e;
         socket_api_handler_t handler = socket->handler;
         err = pbuf_take(pb, buf, len);
-        if (err != ERR_OK) break;
+        if (err != ERR_OK)
+        	break;
         err = udp_sendto(socket->impl, pb, (void *)addr->storage, port);
         pbuf_free(pb);
+        if (err != ERR_OK)
+        	break;
         e.event = SOCKET_EVENT_TX_DONE;
         e.sock = socket;
         e.i.t.sentbytes = len;

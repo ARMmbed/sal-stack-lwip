@@ -15,14 +15,16 @@
  * limitations under the License.
  */
 
-#include <mbed-net-socket-abstract/test/ctest_env.h>
-#include <mbed-net-socket-abstract/test/sal_test_api.h>
-#include <mbed-net-lwip/lwipv4_init.h>
-#include <mbed-net-lwip-eth/EthernetInterface.h>
+#include "mbed-net-socket-abstract/test/ctest_env.h"
+#include "mbed-net-socket-abstract/test/sal_test_api.h"
+#include "mbed-net-lwip/lwipv4_init.h"
+#include "mbed-net-lwip-eth/EthernetInterface.h"
+#include "mbed/test_env.h"
 
 #define TEST_SERVER "192.168.2.1"
 #define TEST_PORT0 32767
 #define TEST_PORT1 32766
+#define TEST_PORT2 32765
 
 int main ()
 {
@@ -32,6 +34,7 @@ int main ()
     /* Initialise with DHCP, connect, and start up the stack */
     eth.init();
     eth.connect();
+    notify_start();
 
     do {
         socket_error_t err = lwipv4_socket_init();
@@ -60,8 +63,10 @@ int main ()
         rc = socket_api_test_echo_client_connected(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, SOCKET_DGRAM, false, TEST_SERVER, TEST_PORT1);
         tests_pass = tests_pass && rc;
 
+        rc = socket_api_test_echo_server_stream(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, eth.getIPAddress(), TEST_PORT2);
+        tests_pass = tests_pass && rc;
 
     } while (0);
-    cnotify_completion(tests_pass);
+    notify_completion(tests_pass);
     return !tests_pass;
 }

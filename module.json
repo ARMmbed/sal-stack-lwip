@@ -27,7 +27,7 @@
     "mbed-net-lwip/lwip/include/netif"
   ],
   "dependencies": {
-    "mbed": "ARMmbed/mbed-sdk-private",
+    "mbed": "ARMmbed/mbed-sdk-private#~3.0.1",
     "mbed-net-socket-abstract": "ARMmbed/mbed-net-socket-abstract#~0.1.1"
   },
   "targetDependencies": {
@@ -35,5 +35,8 @@
       "mbed-net-lwip-k64f": "ARMmbed/mbed-net-lwip-k64f#~0.0.1",
       "mbed-net-lwip-eth": "ARMmbed/mbed-net-lwip-eth#~0.0.1"
     }
+  },
+  "scripts": {
+      "testReporter": ["mbedgt", "--digest", "stdin", "-v", "-V"]
   }
 }

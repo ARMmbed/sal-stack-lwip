@@ -36,5 +36,8 @@
       "mbed-net-lwip-k64f": "~0.0.4",
       "mbed-net-lwip-eth": "~0.0.3"
     }
+  },
+  "scripts": {
+      "testReporter": ["mbedgt", "--digest", "stdin", "-v", "-V"]
   }
 }

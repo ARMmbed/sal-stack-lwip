@@ -90,7 +90,7 @@ static err_t irqTCPSent(void *arg,struct tcp_pcb *tpcb, uint16_t len);
 struct pbuf_wrapper {
     struct pbuf_wrapper *next;
     struct pbuf *p;
-    struct ip_addr *addr;
+    struct ip_addr addr;
     size_t offset;
     uint16_t port;
 };
@@ -209,8 +209,13 @@ static void tcp_error_handler(void *arg, err_t err)
 }
 static socket_error_t lwipv4_socket_create(struct socket *sock, const socket_address_family_t af, const socket_proto_family_t pf, socket_api_handler_t const handler)
 {
-    (void)af;
-    if (sock == NULL)
+    switch (af) {
+        case SOCKET_AF_INET4:
+            break;
+        default:
+            return SOCKET_ERROR_BAD_FAMILY;
+    }
+    if (sock == NULL || handler == NULL)
         return SOCKET_ERROR_NULL_PTR;
     switch (pf) {
     case SOCKET_DGRAM:
@@ -228,12 +233,10 @@ static socket_error_t lwipv4_socket_create(struct socket *sock, const socket_add
       struct tcp_pcb *tcp = tcp_new();
       if (tcp == NULL)
         return SOCKET_ERROR_BAD_ALLOC;
-      tcp_arg(tcp, (void*) sock);
-      tcp_err(tcp, tcp_error_handler);
-      tcp_sent(tcp,irqTCPSent);
       sock->impl = (void *)tcp;
       sock->stack = SOCKET_STACK_LWIP_IPV4;
-      tcp_recv((struct tcp_pcb *)sock->impl, irqTCPRecv);
+      tcp_arg(tcp, (void*) sock);
+      tcp_err(tcp, tcp_error_handler);
       break;
     }
     default:
@@ -255,10 +258,11 @@ static socket_error_t lwipv4_socket_accept(struct socket *sock, socket_api_handl
     case SOCKET_STREAM:
     {
       struct tcp_pcb *tcp = (struct tcp_pcb *)sock->impl;
+      tcp_accepted(tcp);
       tcp_arg(tcp, (void*) sock);
       tcp_err(tcp, tcp_error_handler);
       tcp_sent(tcp,irqTCPSent);
-      tcp_recv((struct tcp_pcb *)sock->impl, irqTCPRecv);
+      tcp_recv(tcp, irqTCPRecv);
       break;
     }
     default:
@@ -330,7 +334,9 @@ static err_t irqConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
     struct socket *sock = (struct socket *) arg;
     socket_api_handler_t handler = (socket_api_handler_t) sock->handler;
     socket_event_t e;
-    (void) tpcb;
+    tcp_sent(tpcb,irqTCPSent);
+    tcp_recv(tpcb, irqTCPRecv);
+
     if (err != ERR_OK)
     {
         e.event = SOCKET_EVENT_ERROR;
@@ -416,6 +422,7 @@ static err_t irqAcceptNull (void * arg, struct tcp_pcb * newpcb, err_t err)
 static socket_error_t start_listen(struct socket *socket, uint32_t backlog)
 {
     struct tcp_pcb * pcb = socket->impl;
+    (void) backlog;
     if (pcb->state != LISTEN) {
         socket->impl = tcp_listen(socket->impl);
         if (socket->impl == NULL) {
@@ -429,7 +436,7 @@ static socket_error_t start_listen(struct socket *socket, uint32_t backlog)
 static socket_error_t stop_listen(struct socket *socket)
 {
     tcp_accept(socket->impl, irqAcceptNull);
-    return SOCKET_ERROR_UNKNOWN;
+    return SOCKET_ERROR_NONE;
 }
 
 
@@ -498,7 +505,7 @@ void irqUDPRecv(void * arg, struct udp_pcb * upcb,
     if(w == NULL) {
         return;
     }
-    w->addr = addr;
+    w->addr = *addr;
     w->port = port;
 
     e.event = SOCKET_EVENT_RX_DONE;
@@ -532,6 +539,7 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
         s->impl = NULL;
         return ERR_OK;
     }
+
     w = rx_core(s, p);
     if(w == NULL) {
         tcp_abort(tpcb);
@@ -604,9 +612,12 @@ socket_error_t lwipv4_socket_send(struct socket *socket, const void * buf, const
         socket_event_t e;
         socket_api_handler_t handler = socket->handler;
         err = pbuf_take(pb, buf, len);
-        if (err != ERR_OK) break;
+        if (err != ERR_OK)
+            break;
         err = udp_send(socket->impl, pb);
         pbuf_free(pb);
+        if (err != ERR_OK)
+            break;
         //Notify the application that the transfer is queued at the MAC layer
         e.event = SOCKET_EVENT_TX_DONE;
         e.sock = socket;
@@ -628,10 +639,21 @@ socket_error_t lwipv4_socket_send_to(struct socket *socket, const void * buf, co
     switch(socket->family) {
     case SOCKET_DGRAM: {
         struct pbuf *pb = pbuf_alloc(PBUF_TRANSPORT,len,PBUF_RAM);
+        socket_event_t e;
+        socket_api_handler_t handler = socket->handler;
         err = pbuf_take(pb, buf, len);
-        if (err != ERR_OK) break;
+        if (err != ERR_OK)
+        	break;
         err = udp_sendto(socket->impl, pb, (void *)addr->storage, port);
         pbuf_free(pb);
+        if (err != ERR_OK)
+        	break;
+        e.event = SOCKET_EVENT_TX_DONE;
+        e.sock = socket;
+        e.i.t.sentbytes = len;
+        socket->event = &e;
+        handler();
+        socket->event = NULL;
         break;
     }
     case SOCKET_STREAM:
@@ -719,8 +741,9 @@ socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t
         }
     } else if (socket->family == SOCKET_DGRAM) {
         struct pbuf_wrapper * pw = (struct pbuf_wrapper *)socket->rxBufChain;
-        *ia = *pw->addr;
+        *ia = pw->addr;
         *port = pw->port;
+        addr->type = SOCKET_STACK_LWIP_IPV4;
     }
     err = recv_copy_free(socket, buf, len);
     return err;

@@ -277,7 +277,7 @@ static socket_error_t lwipv4_socket_accept(struct socket *sock, socket_api_handl
 static socket_error_t lwipv4_socket_close(struct socket *sock)
 {
     err_t err = ERR_OK;
-    if (sock == NULL)
+    if (sock == NULL || sock->impl == NULL)
         return SOCKET_ERROR_NULL_PTR;
     switch (sock->family) {
     case SOCKET_DGRAM:
@@ -293,7 +293,7 @@ static socket_error_t lwipv4_socket_close(struct socket *sock)
 }
 static void lwipv4_socket_abort(struct socket *sock)
 {
-    if (sock == NULL)
+    if (sock == NULL || sock->impl == NULL)
         return;
     switch (sock->family) {
     case SOCKET_DGRAM:
@@ -535,6 +535,8 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
         s->event = &e;
         ((socket_api_handler_t) (s->handler))();
         s->event = NULL;
+        /* Zero the impl, since a disconnect will cause a free */
+        s->impl = NULL;
         return ERR_OK;
     }
 
@@ -679,9 +681,10 @@ static socket_error_t recv_copy_free(struct socket *socket, void * buf,
         size_t *len) {
     struct pbuf_wrapper * pw = (struct pbuf_wrapper *) socket->rxBufChain;
     size_t copied;
-    size_t cplen = ((*len) < (pw->p->len) ? (*len) : (pw->p->len));
+    size_t cplen = pw->p->len - pw->offset;
+    cplen = ((*len) < (cplen) ? (*len) : (cplen));
 
-    copied = pbuf_copy_partial(pw->p, buf, cplen, 0);
+    copied = pbuf_copy_partial(pw->p, buf, cplen, pw->offset);
     if (!copied) {
         return SOCKET_ERROR_SIZE;
     }

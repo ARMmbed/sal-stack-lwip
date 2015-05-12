@@ -23,8 +23,8 @@
 
 int main ()
 {
-    MBED_HOSTTEST_TIMEOUT(5);
-    MBED_HOSTTEST_SELECT(default);
+    MBED_HOSTTEST_TIMEOUT(20);
+    MBED_HOSTTEST_SELECT(tcpecho_client_ext_auto);
     MBED_HOSTTEST_DESCRIPTION(Socket Abstraction Layer construction and utility test);
     MBED_HOSTTEST_START("SAL_INIT_UTIL");
 

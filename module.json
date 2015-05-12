@@ -2,6 +2,7 @@
   "name": "mbed-net-lwip",
   "version": "0.1.2",
   "description": "Lightweight IP",
+  "private": true,
   "keywords": [
     "lwip",
     "network",
@@ -27,13 +28,13 @@
     "mbed-net-lwip/lwip/include/netif"
   ],
   "dependencies": {
-    "mbed": "ARMmbed/mbed-sdk-private",
-    "mbed-net-socket-abstract": "ARMmbed/mbed-net-socket-abstract#~0.1.1"
+    "mbed": "*",
+    "mbed-net-socket-abstract": "~0.1.1"
   },
   "targetDependencies": {
     "lwip-k64f": {
-      "mbed-net-lwip-k64f": "ARMmbed/mbed-net-lwip-k64f#~0.0.1",
-      "mbed-net-lwip-eth": "ARMmbed/mbed-net-lwip-eth#~0.0.1"
+      "mbed-net-lwip-k64f": "~0.0.4",
+      "mbed-net-lwip-eth": "~0.0.3"
     }
   }
 }

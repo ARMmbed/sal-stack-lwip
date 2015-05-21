@@ -24,7 +24,7 @@
 int main ()
 {
     MBED_HOSTTEST_TIMEOUT(20);
-    MBED_HOSTTEST_SELECT(tcpecho_client_ext_auto);
+    MBED_HOSTTEST_SELECT(test_socket_server_tcp);
     MBED_HOSTTEST_DESCRIPTION(Socket Abstraction Layer construction and utility test);
     MBED_HOSTTEST_START("SAL_INIT_UTIL");
 
@@ -66,6 +66,7 @@ int main ()
         rc = socket_api_test_echo_client_connected(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, SOCKET_STREAM, true, ipbuffer, port);
         tests_pass = tests_pass && rc;
     } while (0);
-    notify_completion(tests_pass);
+
+    MBED_HOSTTEST_RESULT(tests_pass);
     return !tests_pass;
 }

@@ -124,15 +124,32 @@ socket_error_t lwipv4_socket_error_remap(err_t lwip_err)
         err = SOCKET_ERROR_BUSY;
         break;
     case ERR_VAL:
+        err = SOCKET_ERROR_VALUE;
+        break;
     case ERR_USE:
+        err = SOCKET_ERROR_ADDRESS_IN_USE;
+        break;
     case ERR_ISCONN:
+        err = SOCKET_ERROR_ALREADY_CONNECTED;
+        break;
     case ERR_ABRT:
+        err = SOCKET_ERROR_ABORT;
+        break;
     case ERR_RST:
+        err = SOCKET_ERROR_RESET;
+        break;
     case ERR_CLSD:
+        err = SOCKET_ERROR_CLOSED;
+        break;
     case ERR_CONN:
+        err = SOCKET_ERROR_NO_CONNECTION;
+        break;
     case ERR_ARG:
+        err = SOCKET_ERROR_BAD_ARGUMENT;
+        break;
     case ERR_IF:
-    break;
+        err = SOCKET_ERROR_BAD_ARGUMENT
+        break;
     }
     return err;
 }

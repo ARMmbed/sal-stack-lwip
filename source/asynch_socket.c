@@ -148,7 +148,7 @@ socket_error_t lwipv4_socket_error_remap(err_t lwip_err)
         err = SOCKET_ERROR_BAD_ARGUMENT;
         break;
     case ERR_IF:
-        err = SOCKET_ERROR_BAD_ARGUMENT
+        err = SOCKET_ERROR_INTERFACE_ERROR;
         break;
     }
     return err;

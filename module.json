@@ -1,6 +1,6 @@
 {
   "name": "mbed-net-lwip",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Lightweight IP",
   "private": true,
   "keywords": [

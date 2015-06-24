@@ -192,8 +192,8 @@ static void dnscb(const char *name, struct ip_addr *addr, void *arg) {
       e.i.e = SOCKET_ERROR_DNS_FAILED;
   } else {
       e.event = SOCKET_EVENT_DNS;
-      e.i.d.addr.type = SOCKET_STACK_LWIP_IPV4;
-      ipv4_addr_cpy(e.i.d.addr.storage, addr);
+      // Install IPv4 prefix
+      socket_addr_set_ipv4_addr(&e.i.d.addr, addr->addr);
       e.i.d.domain = name;
   }
   sock->event = &e;
@@ -373,12 +373,15 @@ static err_t irqConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
 static socket_error_t lwipv4_socket_connect(struct socket *sock, const struct socket_addr *address, const uint16_t port)
 {
     err_t err = ERR_OK;
+    if (!socket_addr_is_ipv4(address)) {
+        return SOCKET_ERROR_BAD_ADDRESS;
+    }
     switch (sock->family){
     case SOCKET_DGRAM:
-        err = udp_connect((struct udp_pcb *)sock->impl, (void*)address->storage, port);
+        err = udp_connect((struct udp_pcb *)sock->impl, (void*)socket_addr_get_ipv4_addrp(address), port);
         break;
     case SOCKET_STREAM:
-        err = tcp_connect((struct tcp_pcb *)sock->impl, (void*)address->storage, port, irqConnect);
+        err = tcp_connect((struct tcp_pcb *)sock->impl, (void*)socket_addr_get_ipv4_addrp(address), port, irqConnect);
         break;
     default:
         return SOCKET_ERROR_BAD_FAMILY;
@@ -389,13 +392,15 @@ static socket_error_t str2addr(const struct socket *sock, struct socket_addr *ad
 {
     socket_error_t err = SOCKET_ERROR_NONE;
     switch(sock->stack)  {
-    case SOCKET_STACK_LWIP_IPV4:
-        if (ipaddr_aton(addr, (void*)address->storage) == -1) {
+    case SOCKET_STACK_LWIP_IPV4: {
+        ip_addr_t a;
+        if (ipaddr_aton(addr, &a) == -1) {
             err = SOCKET_ERROR_BAD_ADDRESS;
-            address->type = SOCKET_STACK_UNINIT;
+        } else {
+            socket_addr_set_ipv4_addr(address, (uint32_t) a.addr);
         }
-        address->type = sock->stack;
         break;
+    }
     default:
         break;
     }
@@ -460,12 +465,15 @@ static socket_error_t stop_listen(struct socket *socket)
 static socket_error_t lwipv4_socket_bind(struct socket *sock, const struct socket_addr *address, const uint16_t port)
 {
     err_t err = ERR_OK;
+    ip_addr_t a;
     switch (sock->family){
     case SOCKET_DGRAM:
-        err = udp_bind((struct udp_pcb *)sock->impl, (void *)address->storage, port);
+        a.addr = socket_addr_get_ipv4_addr(address);
+        err = udp_bind((struct udp_pcb *)sock->impl, &a, port);
         break;
     case SOCKET_STREAM:
-        err = tcp_bind((struct tcp_pcb *)sock->impl, (void *)address->storage, port);
+    a.addr = socket_addr_get_ipv4_addr(address);
+        err = tcp_bind((struct tcp_pcb *)sock->impl, &a, port);
         break;
     default:
         return SOCKET_ERROR_BAD_FAMILY;
@@ -652,6 +660,7 @@ socket_error_t lwipv4_socket_send(struct socket *socket, const void * buf, const
 }
 socket_error_t lwipv4_socket_send_to(struct socket *socket, const void * buf, const size_t len, const struct socket_addr *addr, const uint16_t port)
 {
+    ip_addr_t a;
     err_t err = ERR_VAL;
     switch(socket->family) {
     case SOCKET_DGRAM: {
@@ -661,7 +670,8 @@ socket_error_t lwipv4_socket_send_to(struct socket *socket, const void * buf, co
         err = pbuf_take(pb, buf, len);
         if (err != ERR_OK)
         	break;
-        err = udp_sendto(socket->impl, pb, (void *)addr->storage, port);
+        a.addr = socket_addr_get_ipv4_addr(addr);
+        err = udp_sendto(socket->impl, pb, &a, port);
         pbuf_free(pb);
         if (err != ERR_OK)
         	break;
@@ -734,33 +744,28 @@ socket_error_t lwipv4_socket_recv(struct socket *socket, void * buf, size_t *len
 socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t *len, struct socket_addr *addr, uint16_t *port)
 {
     socket_error_t err = recv_validate(socket, buf, len);
-    ip_addr_t * ia;
     if (err != SOCKET_ERROR_NONE) {
         return err;
     }
     if(addr == NULL || port == NULL) {
         return SOCKET_ERROR_NULL_PTR;
     }
-    ia = (ip_addr_t *)addr->storage;
-    addr->type = SOCKET_STACK_UNINIT;
+    socket_addr_set_any(addr);
 
     if (lwipv4_socket_is_connected(socket)) {
         if (socket->family == SOCKET_DGRAM) {
             struct udp_pcb * upcb = (struct udp_pcb *) socket->impl;
-            *ia = upcb->remote_ip;
+            socket_addr_set_ipv4_addr(addr, upcb->remote_ip.addr);
             *port = upcb->remote_port;
-            addr->type = SOCKET_STACK_LWIP_IPV4;
         } else if (socket->family == SOCKET_STREAM) {
             struct tcp_pcb * tpcb = (struct tcp_pcb *) socket->impl;
-            *ia = tpcb->remote_ip;
+            socket_addr_set_ipv4_addr(addr, tpcb->remote_ip.addr);
             *port = tpcb->remote_port;
-            addr->type = SOCKET_STACK_LWIP_IPV4;
         }
     } else if (socket->family == SOCKET_DGRAM) {
         struct pbuf_wrapper * pw = (struct pbuf_wrapper *)socket->rxBufChain;
-        *ia = pw->addr;
+        socket_addr_set_ipv4_addr(addr, pw->addr.addr);
         *port = pw->port;
-        addr->type = SOCKET_STACK_LWIP_IPV4;
     }
     err = recv_copy_free(socket, buf, len);
     return err;

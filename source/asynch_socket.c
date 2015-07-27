@@ -37,6 +37,7 @@
 #include "lwip/tcp_impl.h"
 #include "lwip/timers.h"
 #include "lwip/dns.h"
+#include "lwip/def.h"
 #include "lwip/ip_addr.h"
 
 
@@ -86,14 +87,6 @@ static err_t irqTCPSent(void *arg,struct tcp_pcb *tpcb, uint16_t len);
 /**
  * @}
  */
-
-struct pbuf_wrapper {
-    struct pbuf_wrapper *next;
-    struct pbuf *p;
-    struct ip_addr addr;
-    size_t offset;
-    uint16_t port;
-};
 
 socket_error_t lwipv4_socket_init() {
     return socket_register_stack(&lwipv4_socket_api);
@@ -325,16 +318,13 @@ static void lwipv4_socket_abort(struct socket *sock)
 }
 static socket_error_t lwipv4_socket_destroy(struct socket *sock)
 {
-    struct pbuf_wrapper * pw;
     if (sock == NULL) {
         return SOCKET_ERROR_NULL_PTR;
     }
-    pw = (struct pbuf_wrapper *) sock->rxBufChain;
-    while (pw != NULL) {
-        struct pbuf_wrapper * next_pw = pw->next;
-        pbuf_free(pw->p);
-        free(pw);
-        pw = next_pw;
+
+    if (sock->rxBufChain != NULL) {
+        pbuf_free((struct pbuf*) sock->rxBufChain);
+        sock->rxBufChain = NULL;
     }
     if (sock->impl != NULL) {
         if (lwipv4_socket_is_connected(sock)) {
@@ -484,36 +474,15 @@ static socket_error_t lwipv4_socket_bind(struct socket *sock, const struct socke
     return lwipv4_socket_error_remap(err);
 }
 
-static struct pbuf_wrapper * rx_core(struct socket * s, struct pbuf *p) {
-    struct socket_event e;
-    struct pbuf_wrapper *w;
-    struct pbuf_wrapper *new_wrap;
+static void rx_core(struct socket * s, struct pbuf *p) {
 
-    new_wrap = malloc(sizeof(struct pbuf_wrapper));
-    if (new_wrap == NULL) {
-        e.event = SOCKET_EVENT_ERROR;
-        e.i.e = SOCKET_ERROR_BAD_ALLOC;
-        s->event = &e;
-        ((socket_api_handler_t)(s->handler))();
-        s->event = NULL;
-        return NULL;
-    }
     __disable_irq();
-    new_wrap->next = NULL;
-    new_wrap->p = p;
-    new_wrap->offset = 0;
-
     if (s->rxBufChain == NULL) {
-        s->rxBufChain = new_wrap;
+        s->rxBufChain = p;
     } else {
-        w = (struct pbuf_wrapper *)s->rxBufChain;
-        while (w->next != NULL) {
-            w = w->next;
-        }
-        w->next = new_wrap;
+        pbuf_cat((struct pbuf *) s->rxBufChain, p);
     }
     __enable_irq();
-    return new_wrap;
 }
 
 void irqUDPRecv(void * arg, struct udp_pcb * upcb,
@@ -522,16 +491,13 @@ void irqUDPRecv(void * arg, struct udp_pcb * upcb,
         u16_t port)
 {
     (void) upcb;
+    // These parameters are extracted from the IP and UDP headers.
+    (void) addr;
+    (void) port;
     struct socket *s = (struct socket *) arg;
-    struct pbuf_wrapper *w;
     struct socket_event e;
 
-    w = rx_core(s, p);
-    if(w == NULL) {
-        return;
-    }
-    w->addr = *addr;
-    w->port = port;
+    rx_core(s, p);
 
     e.event = SOCKET_EVENT_RX_DONE;
     s->event = &e;
@@ -542,9 +508,8 @@ void irqUDPRecv(void * arg, struct udp_pcb * upcb,
 err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
 {
     (void) tpcb;
-    struct socket *s = (struct socket *) arg;
-    struct pbuf_wrapper *w;
     struct socket_event e;
+    struct socket *s = (struct socket *) arg;
 
     if(err != ERR_OK) {
         e.event = SOCKET_EVENT_ERROR;
@@ -565,11 +530,7 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
         return ERR_OK;
     }
 
-    w = rx_core(s, p);
-    if(w == NULL) {
-        tcp_abort(tpcb);
-        return ERR_ABRT;
-    }
+    rx_core(s, p);
 
     e.event = SOCKET_EVENT_RX_DONE;
     s->event = &e;
@@ -706,26 +667,55 @@ static socket_error_t recv_validate(struct socket *socket, void * buf, size_t *l
 
 static socket_error_t recv_copy_free(struct socket *socket, void * buf,
         size_t *len) {
-    struct pbuf_wrapper * pw = (struct pbuf_wrapper *) socket->rxBufChain;
+    struct pbuf *p;
     size_t copied;
-    size_t cplen = pw->p->len - pw->offset;
-    cplen = ((*len) < (cplen) ? (*len) : (cplen));
 
-    copied = pbuf_copy_partial(pw->p, buf, cplen, pw->offset);
-    if (!copied) {
-        return SOCKET_ERROR_SIZE;
-    }
-    *len = copied;
-    if (socket->family ==  SOCKET_STREAM ) {
-        tcp_recved(socket->impl, copied);
+    p = (struct pbuf *) socket->rxBufChain;
+    if (p == NULL) {
+        return SOCKET_ERROR_WOULD_BLOCK;
     }
 
-    if(copied + pw->offset >= pw->p->len) {
-        socket->rxBufChain = pw->next;
-        pbuf_free(pw->p);
-        free(pw);
-    } else {
-        pw->offset += copied;
+    switch (socket->family) {
+        case SOCKET_STREAM: {
+            copied = pbuf_copy_partial(p, buf, *len, 0);
+            tcp_recved(socket->impl, copied);
+            *len = copied;
+            while (copied) {
+                if (copied < p->len) {
+                    p->payload = (char *)p->payload + copied;
+                    p->len -= copied;
+                    copied = 0;
+                } else {
+                    struct pbuf *q;
+                    q = p->next;
+                    copied -= p->len;
+                    /* NOTE: This operation is interrupt safe, but not thread safe. */
+                    if (q != NULL) {
+                        pbuf_ref(q);
+                    }
+                    socket->rxBufChain = q;
+                    pbuf_free(p);
+                    p = q;
+                }
+            }
+            break;
+        }
+        case SOCKET_DGRAM: {
+            struct pbuf *q;
+            size_t cplen = ((*len) < (p->len) ? (*len) : (p->len));
+            copied = pbuf_copy_partial(p, buf, cplen, 0);
+            *len = copied;
+            q = p->next;
+            /* NOTE: This operation is interrupt safe, but not thread safe. */
+            if (q != NULL) {
+                pbuf_ref(q);
+            }
+            socket->rxBufChain = q;
+            pbuf_free(p);
+            break;
+        }
+        default:
+            break;
     }
 
     return SOCKET_ERROR_NONE;
@@ -741,9 +731,14 @@ socket_error_t lwipv4_socket_recv(struct socket *socket, void * buf, size_t *len
     return err;
 }
 
+/*
+ * Recv should not be called from an interrupt context, so the only time interrupts
+ * must be disabled is when freeing a pbuf
+ */
 socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t *len, struct socket_addr *addr, uint16_t *port)
 {
     socket_error_t err = recv_validate(socket, buf, len);
+    struct pbuf *p;
     if (err != SOCKET_ERROR_NONE) {
         return err;
     }
@@ -751,6 +746,7 @@ socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t
         return SOCKET_ERROR_NULL_PTR;
     }
     socket_addr_set_any(addr);
+    p = (struct pbuf *)socket->rxBufChain;
 
     if (lwipv4_socket_is_connected(socket)) {
         if (socket->family == SOCKET_DGRAM) {
@@ -763,9 +759,21 @@ socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t
             *port = tpcb->remote_port;
         }
     } else if (socket->family == SOCKET_DGRAM) {
-        struct pbuf_wrapper * pw = (struct pbuf_wrapper *)socket->rxBufChain;
-        socket_addr_set_ipv4_addr(addr, pw->addr.addr);
-        *port = pw->port;
+        struct udp_hdr * udphdr;
+        struct ip_hdr * iphdr;
+        struct ip_addr srcip;
+        /* roll back the pbuf by udp_hdr to find the source port. */
+        pbuf_header(p, UDP_HLEN);
+        udphdr = p->payload;
+        /* roll back the pbuf by ip_hdr to find the source IP */
+        pbuf_header(p, IP_HLEN);
+        iphdr = p->payload;
+        /* put the pbuf back where it was */
+        pbuf_header(p, -UDP_HLEN - IP_HLEN);
+
+        ip_addr_copy(srcip, iphdr->src);
+        socket_addr_set_ipv4_addr(addr, srcip.addr);
+        *port = ntohs(udphdr->src);
     }
     err = recv_copy_free(socket, buf, len);
     return err;

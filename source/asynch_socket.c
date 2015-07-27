@@ -677,24 +677,33 @@ static socket_error_t recv_copy_free(struct socket *socket, void * buf,
 
     switch (socket->family) {
         case SOCKET_STREAM: {
+            /* Copy out of the pbuf chain */
             copied = pbuf_copy_partial(p, buf, *len, 0);
-            tcp_recved(socket->impl, copied);
+            /* Set the external length to the number of bytes copied */
             *len = copied;
             while (copied) {
                 if (copied < p->len) {
+                    /* advance the payload pointer by the number of bytes copied */
                     p->payload = (char *)p->payload + copied;
+                    /* reduce the length by the number of bytes copied */
                     p->len -= copied;
+                    /* break out of the loop */
                     copied = 0;
                 } else {
                     struct pbuf *q;
+                    uint16_t freelen = p->tot_len;
                     q = p->next;
+                    /* decrement the number of bytes copied by the length of the buffer */
                     copied -= p->len;
+                    /* Free the current pbuf */
                     /* NOTE: This operation is interrupt safe, but not thread safe. */
                     if (q != NULL) {
                         pbuf_ref(q);
                     }
                     socket->rxBufChain = q;
                     pbuf_free(p);
+                    /* Update the TCP window */
+                    tcp_recved(socket->impl, freelen);
                     p = q;
                 }
             }

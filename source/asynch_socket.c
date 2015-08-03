@@ -776,7 +776,7 @@ socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t
     return err;
 }
 
-socket_error_t lwipv4_get_local_addr(struct socket *socket, struct socket_addr *addr)
+socket_error_t lwipv4_get_local_addr(const struct socket *socket, struct socket_addr *addr)
 {
     if (socket == NULL || socket->impl == NULL || addr == NULL)
     {
@@ -789,7 +789,7 @@ socket_error_t lwipv4_get_local_addr(struct socket *socket, struct socket_addr *
     socket_addr_set_ipv4_addr(addr, pcb->local_ip.addr);
     return SOCKET_ERROR_NONE;
 }
-socket_error_t lwipv4_get_remote_addr(struct socket *socket, struct socket_addr *addr)
+socket_error_t lwipv4_get_remote_addr(const struct socket *socket, struct socket_addr *addr)
 {
     if (socket == NULL || socket->impl == NULL || addr == NULL)
     {
@@ -802,7 +802,7 @@ socket_error_t lwipv4_get_remote_addr(struct socket *socket, struct socket_addr 
     socket_addr_set_ipv4_addr(addr, pcb->remote_ip.addr);
     return SOCKET_ERROR_NONE;
 }
-socket_error_t lwipv4_get_local_port(struct socket *socket, uint16_t *port)
+socket_error_t lwipv4_get_local_port(const struct socket *socket, uint16_t *port)
 {
     if (socket == NULL || socket->impl == NULL || port == NULL)
     {
@@ -827,7 +827,7 @@ socket_error_t lwipv4_get_local_port(struct socket *socket, uint16_t *port)
     }
     return SOCKET_ERROR_NONE;
 }
-socket_error_t lwipv4_get_remote_port(struct socket *socket, uint16_t *port)
+socket_error_t lwipv4_get_remote_port(const struct socket *socket, uint16_t *port)
 {
     if (socket == NULL || socket->impl == NULL || port == NULL)
     {

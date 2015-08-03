@@ -25,8 +25,8 @@ int main ()
 {
     MBED_HOSTTEST_TIMEOUT(20);
     MBED_HOSTTEST_SELECT(tcpecho_client_ext_auto);
-    MBED_HOSTTEST_DESCRIPTION(Socket Abstraction Layer construction and utility test);
-    MBED_HOSTTEST_START("SAL_INIT_UTIL");
+    MBED_HOSTTEST_DESCRIPTION(Socket Abstraction Layer TCP Echo Client test);
+    MBED_HOSTTEST_START("SAL_TCP_ECHO_CLIENT");
 
     int tests_pass = 1;
     int rc;

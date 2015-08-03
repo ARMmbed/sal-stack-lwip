@@ -778,9 +778,12 @@ socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t
 
 socket_error_t lwipv4_get_local_addr(struct socket *socket, struct socket_addr *addr)
 {
-    if (socket == NULL || addr == NULL)
+    if (socket == NULL || socket->impl == NULL || addr == NULL)
     {
         return SOCKET_ERROR_NULL_PTR;
+    }
+    if (!lwipv4_socket_is_bound(socket)) {
+        return SOCKET_ERROR_NOT_BOUND;
     }
     struct ip_pcb *pcb = socket->impl;
     socket_addr_set_ipv4_addr(addr, pcb->local_ip.addr);
@@ -788,7 +791,7 @@ socket_error_t lwipv4_get_local_addr(struct socket *socket, struct socket_addr *
 }
 socket_error_t lwipv4_get_remote_addr(struct socket *socket, struct socket_addr *addr)
 {
-    if (socket == NULL || addr == NULL)
+    if (socket == NULL || socket->impl == NULL || addr == NULL)
     {
         return SOCKET_ERROR_NULL_PTR;
     }
@@ -801,9 +804,12 @@ socket_error_t lwipv4_get_remote_addr(struct socket *socket, struct socket_addr 
 }
 socket_error_t lwipv4_get_local_port(struct socket *socket, uint16_t *port)
 {
-    if (socket == NULL || port == NULL)
+    if (socket == NULL || socket->impl == NULL || port == NULL)
     {
         return SOCKET_ERROR_NULL_PTR;
+    }
+    if (!lwipv4_socket_is_bound(socket)) {
+        return SOCKET_ERROR_NOT_BOUND;
     }
     switch (socket->family) {
         case SOCKET_STREAM: {
@@ -823,7 +829,7 @@ socket_error_t lwipv4_get_local_port(struct socket *socket, uint16_t *port)
 }
 socket_error_t lwipv4_get_remote_port(struct socket *socket, uint16_t *port)
 {
-    if (socket == NULL || port == NULL)
+    if (socket == NULL || socket->impl == NULL || port == NULL)
     {
         return SOCKET_ERROR_NULL_PTR;
     }

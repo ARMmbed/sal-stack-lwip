@@ -1,6 +1,6 @@
 {
   "name": "sal-stack-lwip",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Lightweight IP",
   "private": true,
   "keywords": [

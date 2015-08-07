@@ -1,5 +1,5 @@
 {
-  "name": "mbed-net-lwip",
+  "name": "sal-stack-lwip",
   "version": "0.1.7",
   "description": "Lightweight IP",
   "private": true,
@@ -28,16 +28,16 @@
     "mbed-net-lwip/lwip/include/netif"
   ],
   "dependencies": {
-    "mbed-net-socket-abstract": "~0.1.1"
+    "sal": "~0.1.1"
   },
   "targetDependencies": {
     "k64f": {
-      "mbed-net-lwip-k64f": "~0.0.4",
-      "mbed-net-lwip-eth": "~0.0.3"
+      "sal-driver-lwip-k64f-eth": "~0.0.4",
+      "sal-iface-eth": "~0.0.3"
     }
   },
   "testDependencies": {
-    "mbed-core": "~0.2.4"
+    "mbed-drivers": "~0.2.4"
   },
   "scripts": {
     "testReporter": [

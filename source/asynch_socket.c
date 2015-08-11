@@ -40,6 +40,7 @@
 #include "lwip/def.h"
 #include "lwip/ip_addr.h"
 
+#define SOCKET_ABSTRACTION_LAYER_VERSION 1
 
 static uint8_t lwipv4_socket_is_connected(const struct socket *sock);
 /** Forward declaration of the socket api */
@@ -254,7 +255,6 @@ static socket_error_t lwipv4_socket_create(struct socket *sock, const socket_add
     }
     sock->family = pf;
     sock->handler = (void*)handler;
-    sock->status = SOCKET_STATUS_IDLE;
     sock->rxBufChain = NULL;
     return SOCKET_ERROR_NONE;
 }
@@ -279,7 +279,6 @@ static socket_error_t lwipv4_socket_accept(struct socket *sock, socket_api_handl
         return SOCKET_ERROR_BAD_FAMILY;
     }
     sock->handler = (void*)handler;
-    sock->status = SOCKET_STATUS_IDLE;
     sock->rxBufChain = NULL;
     return SOCKET_ERROR_NONE;
 }
@@ -352,7 +351,6 @@ static err_t irqConnect(void * arg, struct tcp_pcb * tpcb, err_t err)
     else
     {
         e.event = SOCKET_EVENT_CONNECT;
-        sock->status |= SOCKET_STATUS_CONNECTED;
     }
     sock->event = &e;
     handler();
@@ -468,9 +466,6 @@ static socket_error_t lwipv4_socket_bind(struct socket *sock, const struct socke
     default:
         return SOCKET_ERROR_BAD_FAMILY;
     }
-    if (err == ERR_OK) {
-        sock->status |= SOCKET_STATUS_BOUND;
-    }
     return lwipv4_socket_error_remap(err);
 }
 
@@ -565,13 +560,6 @@ static uint8_t lwipv4_socket_is_bound(const struct socket *sock) {
         break;
     }
     return 0;
-}
-
-static uint8_t lwipv4_socket_tx_is_busy(const struct socket *sock) {
-    return !!(sock->status & SOCKET_STATUS_TX_BUSY);
-}
-static uint8_t lwipv4_socket_rx_is_busy(const struct socket *sock) {
-    return !!(sock->status & SOCKET_STATUS_RX_BUSY);
 }
 
 err_t irqTCPSent(void *arg,struct tcp_pcb *tpcb, uint16_t len) {
@@ -788,23 +776,96 @@ socket_error_t lwipv4_socket_recv_from(struct socket *socket, void * buf, size_t
     return err;
 }
 
+socket_error_t lwipv4_get_local_addr(const struct socket *socket, struct socket_addr *addr)
+{
+    if (socket == NULL || socket->impl == NULL || addr == NULL)
+    {
+        return SOCKET_ERROR_NULL_PTR;
+    }
+    if (!lwipv4_socket_is_bound(socket)) {
+        return SOCKET_ERROR_NOT_BOUND;
+    }
+    struct ip_pcb *pcb = socket->impl;
+    socket_addr_set_ipv4_addr(addr, pcb->local_ip.addr);
+    return SOCKET_ERROR_NONE;
+}
+socket_error_t lwipv4_get_remote_addr(const struct socket *socket, struct socket_addr *addr)
+{
+    if (socket == NULL || socket->impl == NULL || addr == NULL)
+    {
+        return SOCKET_ERROR_NULL_PTR;
+    }
+    if (!lwipv4_socket_is_connected(socket)) {
+        return SOCKET_ERROR_NO_CONNECTION;
+    }
+    struct ip_pcb *pcb = socket->impl;
+    socket_addr_set_ipv4_addr(addr, pcb->remote_ip.addr);
+    return SOCKET_ERROR_NONE;
+}
+socket_error_t lwipv4_get_local_port(const struct socket *socket, uint16_t *port)
+{
+    if (socket == NULL || socket->impl == NULL || port == NULL)
+    {
+        return SOCKET_ERROR_NULL_PTR;
+    }
+    if (!lwipv4_socket_is_bound(socket)) {
+        return SOCKET_ERROR_NOT_BOUND;
+    }
+    switch (socket->family) {
+        case SOCKET_STREAM: {
+            struct tcp_pcb *pcb = (struct tcp_pcb *) socket->impl;
+            *port = pcb->local_port;
+            break;
+        }
+        case SOCKET_DGRAM: {
+            struct udp_pcb *pcb = (struct udp_pcb *) socket->impl;
+            *port = pcb->local_port;
+            break;
+        }
+        default:
+        break;
+    }
+    return SOCKET_ERROR_NONE;
+}
+socket_error_t lwipv4_get_remote_port(const struct socket *socket, uint16_t *port)
+{
+    if (socket == NULL || socket->impl == NULL || port == NULL)
+    {
+        return SOCKET_ERROR_NULL_PTR;
+    }
+    if (!lwipv4_socket_is_connected(socket)) {
+        return SOCKET_ERROR_NO_CONNECTION;
+    }
+    switch (socket->family) {
+        case SOCKET_STREAM: {
+            struct tcp_pcb *pcb = (struct tcp_pcb *) socket->impl;
+            *port = pcb->remote_port;
+            break;
+        }
+        case SOCKET_DGRAM: {
+            struct udp_pcb *pcb = (struct udp_pcb *) socket->impl;
+            *port = pcb->remote_port;
+            break;
+        }
+        default:
+        break;
+    }
+    return SOCKET_ERROR_NONE;
+
+}
+socket_error_t lwipv4_socket_reject(struct socket *socket)
+{
+    lwipv4_socket_abort(socket);
+    return SOCKET_ERROR_NONE;
+}
+
 const struct socket_api lwipv4_socket_api = {
     .stack = SOCKET_STACK_LWIP_IPV4,
+    .version = SOCKET_ABSTRACTION_LAYER_VERSION,
     .init = init,
-//    .buf_api = {
-//        //.stack_to_buf = ,
-//        .get_ptr = lwip_buf_get_ptr,
-//        .get_size = lwip_buf_get_size,
-//        .alloc = lwip_buf_alloc,
-//        .try_free = lwip_buf_try_free,
-//        .free = lwip_buf_free,
-//        .u2b = lwip_copy_from_user,
-//        .b2u = lwip_copy_to_user,
-//    },
     .create = lwipv4_socket_create,
     .destroy = lwipv4_socket_destroy,
     .close = lwipv4_socket_close,
-//    .abort = lwipv4_socket_abort,
     .periodic_task = lwipv4_socket_periodic_task,
     .periodic_interval = lwipv4_socket_periodic_interval,
     .resolve = lwipv4_socket_resolve,
@@ -814,14 +875,15 @@ const struct socket_api lwipv4_socket_api = {
     .start_listen = start_listen,
     .stop_listen = stop_listen,
     .accept = lwipv4_socket_accept,
-//    .start_send = lwipv4_socket_start_send,
-//    .start_recv = lwipv4_socket_start_recv,
+    .reject = lwipv4_socket_reject,
     .send = lwipv4_socket_send,
     .send_to = lwipv4_socket_send_to,
     .recv = lwipv4_socket_recv,
     .recv_from = lwipv4_socket_recv_from,
     .is_connected = lwipv4_socket_is_connected,
     .is_bound = lwipv4_socket_is_bound,
-    .tx_busy = lwipv4_socket_tx_is_busy,
-    .rx_busy = lwipv4_socket_rx_is_busy,
+    .get_local_addr = lwipv4_get_local_addr,
+    .get_remote_addr = lwipv4_get_remote_addr,
+    .get_local_port = lwipv4_get_local_port,
+    .get_remote_port = lwipv4_get_remote_port,
 };

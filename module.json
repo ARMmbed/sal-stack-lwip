@@ -32,7 +32,7 @@
   },
   "targetDependencies": {
     "k64f": {
-      "sal-driver-lwip-k64f-eth": "~0.0.4",
+      "sal-driver-lwip-k64f-eth": "~0.1.0",
       "sal-iface-eth": "~0.1.0"
     }
   },

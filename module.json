@@ -1,6 +1,6 @@
 {
   "name": "sal-stack-lwip",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "Lightweight IP",
   "private": true,
   "keywords": [
@@ -28,7 +28,7 @@
     "mbed-net-lwip/lwip/include/netif"
   ],
   "dependencies": {
-    "sal": "~0.1.1"
+    "sal": "~0.2.0"
   },
   "targetDependencies": {
     "k64f": {

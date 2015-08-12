@@ -18,7 +18,7 @@
 #include "mbed-net-socket-abstract/test/ctest_env.h"
 #include "mbed-net-socket-abstract/test/sal_test_api.h"
 #include "mbed-net-lwip/lwipv4_init.h"
-#include "mbed-net-lwip-eth/EthernetInterface.h"
+#include "EthernetInterface.h"
 #include "mbed/test_env.h"
 
 #define TEST_SERVER "192.168.2.1"
@@ -26,8 +26,10 @@
 #define TEST_PORT1 32766
 #define TEST_PORT2 32765
 
-int main ()
+void app_start(int argc, char *argv[])
 {
+    (void) argc;
+    (void) argv;
     int tests_pass = 1;
     int rc;
     EthernetInterface eth;
@@ -68,5 +70,4 @@ int main ()
 
     } while (0);
     notify_completion(tests_pass);
-    return !tests_pass;
 }

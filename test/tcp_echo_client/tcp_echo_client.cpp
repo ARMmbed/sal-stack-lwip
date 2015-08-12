@@ -18,11 +18,13 @@
 #include "mbed-net-socket-abstract/test/ctest_env.h"
 #include "mbed-net-socket-abstract/test/sal_test_api.h"
 #include "mbed-net-lwip/lwipv4_init.h"
-#include "mbed-net-lwip-eth/EthernetInterface.h"
+#include "EthernetInterface.h"
 #include "mbed/test_env.h"
 
-int main ()
+void app_start(int argc, char *argv[])
 {
+    (void) argc;
+    (void) argv;
     MBED_HOSTTEST_TIMEOUT(20);
     MBED_HOSTTEST_SELECT(tcpecho_client_ext_auto);
     MBED_HOSTTEST_DESCRIPTION(Socket Abstraction Layer TCP Echo Client test);
@@ -67,5 +69,4 @@ int main ()
         tests_pass = tests_pass && rc;
     } while (0);
     notify_completion(tests_pass);
-    return !tests_pass;
 }

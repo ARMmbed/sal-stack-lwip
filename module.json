@@ -38,16 +38,16 @@
     "mbed-net-lwip/lwip/include/netif"
   ],
   "dependencies": {
-    "sal": "~0.2.0"
+    "sal": "~0.4.0"
   },
   "targetDependencies": {
     "k64f": {
-      "sal-driver-lwip-k64f-eth": "~0.1.0",
-      "sal-iface-eth": "~0.1.0"
+      "sal-driver-lwip-k64f-eth": "~0.2.0",
+      "sal-iface-eth": "~0.3.0"
     }
   },
   "testDependencies": {
-    "mbed-drivers": "~0.9.0"
+    "mbed-drivers": "~0.10.0"
   },
   "scripts": {
     "testReporter": [

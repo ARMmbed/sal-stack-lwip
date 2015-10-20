@@ -26,9 +26,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <mbed-net-socket-abstract/socket_api.h>
+#include "sal/socket_api.h"
 
-#include "lwipv4_init.h"
+#include "sal-stack-lwip/lwipv4_init.h"
 
 #include "lwip/netif.h"
 #include "lwip/sockets.h"

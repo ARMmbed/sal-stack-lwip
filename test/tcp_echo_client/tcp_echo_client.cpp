@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-#include "mbed-net-socket-abstract/test/ctest_env.h"
-#include "mbed-net-socket-abstract/test/sal_test_api.h"
-#include "mbed-net-lwip/lwipv4_init.h"
+#include "sal/test/ctest_env.h"
+#include "sal/test/sal_test_api.h"
+#include "sal-stack-lwip/lwipv4_init.h"
 #include "EthernetInterface.h"
-#include "mbed/test_env.h"
+#include "mbed-drivers/test_env.h"
 
 void app_start(int argc, char *argv[])
 {

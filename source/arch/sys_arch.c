@@ -18,9 +18,9 @@
 #include <string.h>
 
 /* mbed includes */
-#include "mbed_error.h"
-#include "mbed_interface.h"
-#include "us_ticker_api.h"
+#include "mbed-drivers/mbed_error.h"
+#include "mbed-drivers/mbed_interface.h"
+#include "mbed-hal/us_ticker_api.h"
 
 /* lwIP includes. */
 #include "lwip/opt.h"
@@ -28,7 +28,7 @@
 #include "lwip/def.h"
 #include "lwip/sys.h"
 #include "lwip/mem.h"
-#include "sys_arch.h"
+#include "sal-stack-lwip/arch/sys_arch.h"
 
 #if NO_SYS==1
 #include "cmsis.h"

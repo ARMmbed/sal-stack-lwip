@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_SNMP_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_SNMP_H__
 #warning mbed-net-lwip/lwip/include/lwip/snmp.h is deprecated.  Please use sal-stack-lwip/lwip/include/lwip/snmp.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/lwip/snmp.h"
+#include "sal-stack-lwip/lwip/include/lwip/snmp.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_SNMP_H__
 

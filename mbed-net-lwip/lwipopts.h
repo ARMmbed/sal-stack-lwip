@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIPOPTS_H__
 #define __MBED_NET_LWIP_LWIPOPTS_H__
 #warning mbed-net-lwip/lwipopts.h is deprecated.  Please use sal-stack-lwip/lwipopts.h instead.
-#include "../sal-stack-lwip/lwipopts.h"
+#include "sal-stack-lwip/lwipopts.h"
 #endif // __MBED_NET_LWIP_LWIPOPTS_H__
 

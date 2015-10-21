@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_NETIF_SLIPIF_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_NETIF_SLIPIF_H__
 #warning mbed-net-lwip/lwip/include/netif/slipif.h is deprecated.  Please use sal-stack-lwip/lwip/include/netif/slipif.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/netif/slipif.h"
+#include "sal-stack-lwip/lwip/include/netif/slipif.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_NETIF_SLIPIF_H__
 

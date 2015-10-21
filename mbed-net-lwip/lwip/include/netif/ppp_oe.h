@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_NETIF_PPP_OE_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_NETIF_PPP_OE_H__
 #warning mbed-net-lwip/lwip/include/netif/ppp_oe.h is deprecated.  Please use sal-stack-lwip/lwip/include/netif/ppp_oe.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/netif/ppp_oe.h"
+#include "sal-stack-lwip/lwip/include/netif/ppp_oe.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_NETIF_PPP_OE_H__
 

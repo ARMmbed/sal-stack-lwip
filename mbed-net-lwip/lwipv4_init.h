@@ -17,6 +17,5 @@
 #ifndef __MBED_NET_LWIP_LWIPV4_INIT_H__
 #define __MBED_NET_LWIP_LWIPV4_INIT_H__
 #warning mbed-net-lwip/lwipv4_init.h is deprecated.  Please use sal-stack-lwip/lwipv4_init.h instead.
-#include "../sal-stack-lwip/lwipv4_init.h"
+#include "sal-stack-lwip/lwipv4_init.h"
 #endif // __MBED_NET_LWIP_LWIPV4_INIT_H__
-

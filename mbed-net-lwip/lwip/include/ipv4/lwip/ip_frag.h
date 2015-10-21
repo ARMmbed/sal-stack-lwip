@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IP_FRAG_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IP_FRAG_H__
 #warning mbed-net-lwip/lwip/include/ipv4/lwip/ip_frag.h is deprecated.  Please use sal-stack-lwip/lwip/include/ipv4/lwip/ip_frag.h instead.
-#include "../../../../../sal-stack-lwip/lwip/include/ipv4/lwip/ip_frag.h"
+#include "sal-stack-lwip/lwip/include/ipv4/lwip/ip_frag.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IP_FRAG_H__
 

@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_RAW_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_RAW_H__
 #warning mbed-net-lwip/lwip/include/lwip/raw.h is deprecated.  Please use sal-stack-lwip/lwip/include/lwip/raw.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/lwip/raw.h"
+#include "sal-stack-lwip/lwip/include/lwip/raw.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_RAW_H__
 

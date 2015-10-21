@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_STATS_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_STATS_H__
 #warning mbed-net-lwip/lwip/include/lwip/stats.h is deprecated.  Please use sal-stack-lwip/lwip/include/lwip/stats.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/lwip/stats.h"
+#include "sal-stack-lwip/lwip/include/lwip/stats.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_STATS_H__
 

@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_UDP_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_UDP_H__
 #warning mbed-net-lwip/lwip/include/lwip/udp.h is deprecated.  Please use sal-stack-lwip/lwip/include/lwip/udp.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/lwip/udp.h"
+#include "sal-stack-lwip/lwip/include/lwip/udp.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_UDP_H__
 

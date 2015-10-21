@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_ARCH_PERF_H__
 #define __MBED_NET_LWIP_ARCH_PERF_H__
 #warning mbed-net-lwip/arch/perf.h is deprecated.  Please use sal-stack-lwip/arch/perf.h instead.
-#include "../../sal-stack-lwip/arch/perf.h"
+#include "sal-stack-lwip/arch/perf.h"
 #endif // __MBED_NET_LWIP_ARCH_PERF_H__
 

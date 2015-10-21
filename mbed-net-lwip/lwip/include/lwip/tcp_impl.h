@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_TCP_IMPL_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_TCP_IMPL_H__
 #warning mbed-net-lwip/lwip/include/lwip/tcp_impl.h is deprecated.  Please use sal-stack-lwip/lwip/include/lwip/tcp_impl.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/lwip/tcp_impl.h"
+#include "sal-stack-lwip/lwip/include/lwip/tcp_impl.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_TCP_IMPL_H__
 

@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_INIT_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_INIT_H__
 #warning mbed-net-lwip/lwip/include/lwip/init.h is deprecated.  Please use sal-stack-lwip/lwip/include/lwip/init.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/lwip/init.h"
+#include "sal-stack-lwip/lwip/include/lwip/init.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_INIT_H__
 

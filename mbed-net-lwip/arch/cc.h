@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_ARCH_CC_H__
 #define __MBED_NET_LWIP_ARCH_CC_H__
 #warning mbed-net-lwip/arch/cc.h is deprecated.  Please use sal-stack-lwip/arch/cc.h instead.
-#include "../../sal-stack-lwip/arch/cc.h"
+#include "sal-stack-lwip/arch/cc.h"
 #endif // __MBED_NET_LWIP_ARCH_CC_H__
 

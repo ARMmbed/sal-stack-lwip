@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IP_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IP_H__
 #warning mbed-net-lwip/lwip/include/ipv4/lwip/ip.h is deprecated.  Please use sal-stack-lwip/lwip/include/ipv4/lwip/ip.h instead.
-#include "../../../../../sal-stack-lwip/lwip/include/ipv4/lwip/ip.h"
+#include "sal-stack-lwip/lwip/include/ipv4/lwip/ip.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IP_H__
 

@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IGMP_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IGMP_H__
 #warning mbed-net-lwip/lwip/include/ipv4/lwip/igmp.h is deprecated.  Please use sal-stack-lwip/lwip/include/ipv4/lwip/igmp.h instead.
-#include "../../../../../sal-stack-lwip/lwip/include/ipv4/lwip/igmp.h"
+#include "sal-stack-lwip/lwip/include/ipv4/lwip/igmp.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_IPV4_LWIP_IGMP_H__
 

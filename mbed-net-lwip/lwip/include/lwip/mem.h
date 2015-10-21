@@ -17,6 +17,6 @@
 #ifndef __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_MEM_H__
 #define __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_MEM_H__
 #warning mbed-net-lwip/lwip/include/lwip/mem.h is deprecated.  Please use sal-stack-lwip/lwip/include/lwip/mem.h instead.
-#include "../../../../sal-stack-lwip/lwip/include/lwip/mem.h"
+#include "sal-stack-lwip/lwip/include/lwip/mem.h"
 #endif // __MBED_NET_LWIP_LWIP_INCLUDE_LWIP_MEM_H__
 

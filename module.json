@@ -32,15 +32,15 @@
     }
   ],
   "extraIncludes": [
-    "mbed-net-lwip",
-    "mbed-net-lwip/arch",
-    "mbed-net-lwip/lwip",
-    "mbed-net-lwip/lwip/include",
-    "mbed-net-lwip/lwip/include/ipv4",
-    "mbed-net-lwip/lwip/include/netif"
+    "sal-stack-lwip",
+    "sal-stack-lwip/arch",
+    "sal-stack-lwip/lwip",
+    "sal-stack-lwip/lwip/include",
+    "sal-stack-lwip/lwip/include/ipv4",
+    "sal-stack-lwip/lwip/include/netif"
   ],
   "dependencies": {
-    "sal": "^1.0.0"
+    "sal": "^1.0.1"
   },
   "targetDependencies": {
     "k64f": {
@@ -49,7 +49,7 @@
     }
   },
   "testDependencies": {
-    "mbed-drivers": "~0.11.0"
+    "mbed-drivers": "~0.11.1"
   },
   "scripts": {
     "testReporter": [

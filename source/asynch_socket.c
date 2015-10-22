@@ -858,6 +858,26 @@ socket_error_t lwipv4_socket_reject(struct socket *socket)
     lwipv4_socket_abort(socket);
     return SOCKET_ERROR_NONE;
 }
+socket_error_t lwipv4_socket_set_option(struct socket *socket, const socket_proto_level_t level,
+        const socket_option_type_t type, const void *option, const size_t optionSize)
+{
+    (void) socket;
+    (void) level;
+    (void) type;
+    (void) option;
+    (void) optionSize;
+    return SOCKET_ERROR_UNIMPLEMENTED;
+}
+socket_error_t lwipv4_socket_get_option(struct socket *socket, const socket_proto_level_t level,
+        const socket_option_type_t type, void *option, const size_t optionSize)
+{
+    (void) socket;
+    (void) level;
+    (void) type;
+    (void) option;
+    (void) optionSize;
+    return SOCKET_ERROR_UNIMPLEMENTED;
+}
 
 const struct socket_api lwipv4_socket_api = {
     .stack = SOCKET_STACK_LWIP_IPV4,
@@ -880,6 +900,8 @@ const struct socket_api lwipv4_socket_api = {
     .send_to = lwipv4_socket_send_to,
     .recv = lwipv4_socket_recv,
     .recv_from = lwipv4_socket_recv_from,
+    .set_option = lwipv4_socket_set_option,
+    .get_option = lwipv4_socket_get_option,
     .is_connected = lwipv4_socket_is_connected,
     .is_bound = lwipv4_socket_is_bound,
     .get_local_addr = lwipv4_get_local_addr,

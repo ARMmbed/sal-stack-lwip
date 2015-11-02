@@ -60,7 +60,13 @@
 
 #define PBUF_POOL_SIZE              5
 #define MEMP_NUM_TCP_PCB_LISTEN     4
+
+#ifdef YOTTA_CFG_MBED_OS_NET_TCP_MAX_STREAMS
+#define MEMP_NUM_TCP_PCB            (YOTTA_CFG_MBED_OS_NET_TCP_MAX_STREAMS)
+#else
 #define MEMP_NUM_TCP_PCB            4
+#endif
+
 #define MEMP_NUM_PBUF               8
 
 #define TCP_QUEUE_OOSEQ             0

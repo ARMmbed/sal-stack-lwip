@@ -17,10 +17,11 @@
 #ifndef MBED_LWIPV4_INIT_H_
 #define MBED_LWIPV4_INIT_H_
 
+#include "sal/socket_types.h"
+
 #ifdef __cplusplus
 extern "C"
 #endif
-#include "sal/socket_types.h"
 socket_error_t lwipv4_socket_init();
 
 #endif // MBED_LWIPV4_INIT_H_

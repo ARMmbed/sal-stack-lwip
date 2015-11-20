@@ -47,7 +47,7 @@
       "sal-driver-lwip-k64f-eth": "^1.0.0",
       "sal-iface-eth": "^1.0.0"
     },
-	"nuc472": {
+    "nuc472": {
       "sal-driver-lwip-nuc472-eth": "^1.0.0",
       "sal-iface-eth": "^1.0.0"
     }	

@@ -395,6 +395,14 @@ static socket_error_t str2addr(const struct socket *sock, struct socket_addr *ad
     return err;
 }
 
+static err_t irqTCPRefuse(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err) {
+    (void) arg;
+    (void) tpcb;
+    (void) p;
+    (void) err;
+    return ERR_WOULDBLOCK;
+}
+
 static err_t irqAccept (void * arg, struct tcp_pcb * newpcb, err_t err)
 {
     struct socket * s = (struct socket *)arg;
@@ -410,6 +418,7 @@ static err_t irqAccept (void * arg, struct tcp_pcb * newpcb, err_t err)
         s->event = NULL;
     } else {
         e.event = SOCKET_EVENT_ACCEPT;
+        tcp_recv(newpcb, irqTCPRefuse);
         e.i.a.newimpl = newpcb;
         e.i.a.reject = 0;
         s->event = &e;

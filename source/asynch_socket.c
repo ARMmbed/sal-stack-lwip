@@ -610,9 +610,14 @@ socket_error_t lwipv4_socket_send(struct socket *socket, const void * buf, const
         socket->event = NULL;
         break;
     }
-    case SOCKET_STREAM:
-        err = tcp_write(socket->impl,buf,len,TCP_WRITE_FLAG_COPY);
-        break;
+    case SOCKET_STREAM:{
+            struct tcp_pcb* pcb = socket->impl;
+            err = tcp_write(pcb,buf,len,TCP_WRITE_FLAG_COPY);
+            if (tcp_nagle_disabled(pcb)) {
+                tcp_output(pcb);
+            }
+            break;
+        }
     }
     return lwipv4_socket_error_remap(err);
 }
@@ -870,12 +875,26 @@ socket_error_t lwipv4_socket_reject(struct socket *socket)
 socket_error_t lwipv4_socket_set_option(struct socket *socket, const socket_proto_level_t level,
         const socket_option_type_t type, const void *option, const size_t optionSize)
 {
-    (void) socket;
     (void) level;
-    (void) type;
-    (void) option;
     (void) optionSize;
-    return SOCKET_ERROR_UNIMPLEMENTED;
+    socket_error_t err = SOCKET_ERROR_UNIMPLEMENTED;
+    switch (type) {
+        case SOCKET_OPT_NAGGLE: {
+            if (socket->family != SOCKET_STREAM)
+                return SOCKET_ERROR_UNIMPLEMENTED;
+            if(option == NULL) {
+                tcp_nagle_disable((struct tcp_pcb *) socket->impl);
+            } else {
+                tcp_nagle_enable((struct tcp_pcb *) socket->impl);
+            }
+            err = SOCKET_ERROR_NONE;
+            break;
+        }
+        default:
+            break;
+
+    }
+    return err;
 }
 socket_error_t lwipv4_socket_get_option(struct socket *socket, const socket_proto_level_t level,
         const socket_option_type_t type, void *option, const size_t optionSize)

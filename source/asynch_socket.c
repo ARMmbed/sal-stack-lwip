@@ -879,12 +879,15 @@ socket_error_t lwipv4_socket_set_option(struct socket *socket, const socket_prot
     (void) optionSize;
     socket_error_t err = SOCKET_ERROR_UNIMPLEMENTED;
     switch (type) {
-        case SOCKET_OPT_NAGGLE: {
+        case SOCKET_OPT_NAGLE: {
             if (socket->family != SOCKET_STREAM)
                 return SOCKET_ERROR_UNIMPLEMENTED;
+            /* Check the pointer. If it is NULL, disable Nagle's Algorithm. If not, enable Nagle's Algorithm.
+             * This approach is used because configuration data could be passed via a structure */
             if(option == NULL) {
                 tcp_nagle_disable((struct tcp_pcb *) socket->impl);
             } else {
+
                 tcp_nagle_enable((struct tcp_pcb *) socket->impl);
             }
             err = SOCKET_ERROR_NONE;

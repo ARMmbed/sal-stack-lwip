@@ -40,7 +40,7 @@
     "sal-stack-lwip/lwip/include/netif"
   ],
   "dependencies": {
-    "sal": "^1.0.1"
+    "sal": "^1.0.3"
   },
   "targetDependencies": {
     "k64f": {

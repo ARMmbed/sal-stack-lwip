@@ -309,6 +309,34 @@ static socket_error_t lwipv4_socket_accept(struct socket *sock, socket_api_handl
     return SOCKET_ERROR_NONE;
 }
 
+static socket_error_t accept_v2(struct socket *listener, struct socket *sock, socket_api_handler_t handler) {
+    if (sock == NULL || sock->impl == NULL)
+        return SOCKET_ERROR_NULL_PTR;
+    switch (sock->family) {
+    case SOCKET_DGRAM:
+        return SOCKET_ERROR_UNIMPLEMENTED;
+    case SOCKET_STREAM:
+    {
+      struct tcp_pcb *tcp = (struct tcp_pcb *)sock->impl;
+      struct tcp_pcb *lpcb = (struct tcp_pcb *)listener->impl;
+      /* NOTE: tcp_accepted() is replaced with an empty statement in release,
+       * so we need a cast-to-void to remove the unused variable warning */
+      (void) lpcb;
+      tcp_accepted(lpcb);
+      tcp_arg(tcp, (void*) sock);
+      tcp_err(tcp, tcp_error_handler);
+      tcp_sent(tcp, irqTCPSent);
+      tcp_recv(tcp, irqTCPRecv);
+      break;
+    }
+    default:
+        return SOCKET_ERROR_BAD_FAMILY;
+    }
+    sock->handler = (void*)handler;
+    sock->rxBufChain = NULL;
+    return SOCKET_ERROR_NONE;
+}
+
 static socket_error_t lwipv4_socket_close(struct socket *sock)
 {
     err_t err = ERR_OK;
@@ -981,4 +1009,5 @@ const struct socket_api lwipv4_socket_api = {
     .get_remote_addr = lwipv4_get_remote_addr,
     .get_local_port = lwipv4_get_local_port,
     .get_remote_port = lwipv4_get_remote_port,
+    .accept_v2 = accept_v2,
 };

@@ -33,6 +33,7 @@ void app_start(int argc, char *argv[])
     int tests_pass = 1;
     int rc;
     EthernetInterface eth;
+
     /* Initialise with DHCP, connect, and start up the stack */
     eth.init();
     eth.connect();
@@ -52,18 +53,6 @@ void app_start(int argc, char *argv[])
         // Need create/destroy for all subsequent tests
         // str2addr is required for connect test
         if (!tests_pass) break;
-
-        rc = socket_api_test_connect_close(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET6,TEST_SERVER, TEST_PORT0);
-        tests_pass = tests_pass && rc;
-
-        rc = socket_api_test_echo_client_connected(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, SOCKET_STREAM, true, TEST_SERVER, TEST_PORT0);
-        tests_pass = tests_pass && rc;
-
-        rc = socket_api_test_echo_client_connected(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, SOCKET_DGRAM, true, TEST_SERVER, TEST_PORT1);
-        tests_pass = tests_pass && rc;
-
-        rc = socket_api_test_echo_client_connected(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, SOCKET_DGRAM, false, TEST_SERVER, TEST_PORT1);
-        tests_pass = tests_pass && rc;
 
         rc = socket_api_test_echo_server_stream(SOCKET_STACK_LWIP_IPV4, SOCKET_AF_INET4, eth.getIPAddress(), TEST_PORT2);
         tests_pass = tests_pass && rc;

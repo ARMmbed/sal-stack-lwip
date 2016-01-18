@@ -34,6 +34,12 @@ void app_start(int argc, char *argv[])
     int rc;
     EthernetInterface eth;
 
+    /* mbed greentea init */
+    MBED_HOSTTEST_TIMEOUT(20);
+    MBED_HOSTTEST_SELECT(sal_tcpclient);
+    MBED_HOSTTEST_DESCRIPTION(SalTcpClientTest);
+    MBED_HOSTTEST_START("Socket Abstract Layer TCP Server Connection/Tx/Rx Socket Stream Test");
+
     /* Initialise with DHCP, connect, and start up the stack */
     eth.init();
     eth.connect();

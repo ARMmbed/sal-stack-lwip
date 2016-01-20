@@ -288,12 +288,12 @@ class sal_test:
             self.sal_stack_lwip_unsymlink()
             return ret
 
-        bashCommand = "pushd sal-stack-lwip && mbedgt -V && popd" 
-        ret = self.doBashCmd(bashCommand)
-        if ret != MBED_SUCCESS:
-            dbg(sys._getframe().f_code.co_name + ": failed to yotta build.") 
-            self.sal_stack_lwip_unsymlink()
-            return ret
+        #bashCommand = "pushd sal-stack-lwip && mbedgt -V && popd" 
+        #ret = self.doBashCmd(bashCommand)
+        #if ret != MBED_SUCCESS:
+        #    dbg(sys._getframe().f_code.co_name + ": failed to yotta build.") 
+        #    self.sal_stack_lwip_unsymlink()
+        #    return ret
 
         self.sal_yt_unlink()
         self.sal_stack_lwip_yt_unlink()

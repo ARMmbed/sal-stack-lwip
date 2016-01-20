@@ -67,6 +67,64 @@ class sal_test:
         ret = subprocess.call(strBashCommand.split(), shell=True)
         return ret
 
+    def sal_yt_link(self):
+        ret = MBED_FAILURE
+
+        dbg(sys._getframe().f_code.co_name + ":entered")
+        dbg(sys._getframe().f_code.co_name + ":ret=" + str(ret))
+        
+        bashCommand = "pushd sal && yotta -t frdm-k64f-gcc link && popd" 
+        ret = self.doBashCmd(bashCommand)
+        if ret != MBED_SUCCESS:
+            dbg(sys._getframe().f_code.co_name + ": failed to yotta link sal.") 
+            return ret;
+ 
+        return ret
+
+    def sal_yt_unlink(self):
+        ret = MBED_FAILURE
+
+        dbg(sys._getframe().f_code.co_name + ":entered")
+        dbg(sys._getframe().f_code.co_name + ":ret=" + str(ret))
+        
+        # remove the symlink C:\mbed_tools\Python27\Lib\yotta_modules\sal for sal 
+        bashCommand = "pushd sal && yotta unlink && popd" 
+        ret = self.doBashCmd(bashCommand)
+        if ret != MBED_SUCCESS:
+            dbg(sys._getframe().f_code.co_name + ": failed to yotta remove symlink in sal.") 
+            return ret;
+
+        return ret
+
+    def sal_stack_lwip_yt_link(self):
+        ret = MBED_FAILURE
+
+        dbg(sys._getframe().f_code.co_name + ":entered")
+        dbg(sys._getframe().f_code.co_name + ":ret=" + str(ret))
+        
+        bashCommand = "pushd sal-stack-lwip && yotta -t frdm-k64f-gcc link sal && popd" 
+        ret = self.doBashCmd(bashCommand)
+        if ret != MBED_SUCCESS:
+            dbg(sys._getframe().f_code.co_name + ": failed to yotta link sal.") 
+            return ret;
+ 
+        return ret
+
+    def sal_stack_lwip_yt_unlink(self):
+        ret = MBED_FAILURE
+
+        dbg(sys._getframe().f_code.co_name + ":entered")
+        dbg(sys._getframe().f_code.co_name + ":ret=" + str(ret))
+        
+        bashCommand = "pushd sal-stack-lwip && yotta unlink sal && popd" 
+        ret = self.doBashCmd(bashCommand)
+        if ret != MBED_SUCCESS:
+            dbg(sys._getframe().f_code.co_name + ": failed to yotta remove symlink to sal.") 
+            return ret;
+
+        return ret
+
+
     def sal_stack_lwip_symlink(self):
         ret = MBED_FAILURE
 
@@ -102,7 +160,7 @@ class sal_test:
     #  this is the main function that implements the functionality
     ##############################################################################
 		     
-    def run(self, args):
+    def run_old(self, args):
         ret = MBED_FAILURE
 
         dbg(sys._getframe().f_code.co_name + ":entered")
@@ -158,6 +216,71 @@ class sal_test:
             self.sal_stack_lwip_unsymlink()
             return ret
 
+        bashCommand = "pushd sal-stack-lwip && mbedgt -V && popd" 
+        ret = self.doBashCmd(bashCommand)
+        if ret != MBED_SUCCESS:
+            dbg(sys._getframe().f_code.co_name + ": failed to yotta build.") 
+            self.sal_stack_lwip_unsymlink()
+            return ret
+
+        ret = self.sal_stack_lwip_unsymlink()
+        if ret != MBED_SUCCESS:
+            return ret
+
+    def run(self, args):
+        ret = MBED_FAILURE
+
+        dbg(sys._getframe().f_code.co_name + ":entered")
+        dbg(sys._getframe().f_code.co_name + ":ret=" + str(ret))
+        
+        # CI (i.e. jenkins) is setup to clone the sal-test and sal-stack-lwip repos so
+        # the cloning of the repos is not required. The noclone option allows the 
+        # cloning of the repos to be skipped
+        if args.noclone is False:
+            # e.g. running outside of noclone so dont clone repositories
+        
+            bashCommand = "git clone git@github.com:/simonqhughes/sal.git sal" 
+            ret = self.doBashCmd(bashCommand)
+            if ret != MBED_SUCCESS:
+                dbg(sys._getframe().f_code.co_name + ": failed to clone sal repo.") 
+                return ret;
+                
+            bashCommand = "git clone git@github.com:/simonqhughes/sal-stack-lwip.git sal-stack-lwip" 
+            ret = self.doBashCmd(bashCommand)
+            if ret != MBED_SUCCESS:
+                dbg(sys._getframe().f_code.co_name + ": failed to clone sal-stack-lwip repo.") 
+                return ret
+
+        # set the target first as this is required by other commands.
+        bashCommand = "pushd sal-stack-lwip && yotta target frdm-k64f-gcc && popd" 
+        ret = self.doBashCmd(bashCommand)
+        if ret != MBED_SUCCESS:
+            dbg(sys._getframe().f_code.co_name + ": failed to set yotta target.") 
+            return ret
+
+        bashCommand = "pushd sal-stack-lwip && yotta -t frdm-k64f-gcc install && popd" 
+        ret = self.doBashCmd(bashCommand)
+        if ret != MBED_SUCCESS:
+            dbg(sys._getframe().f_code.co_name + ": failed to yotta install in pushd sal-stack-lwip.") 
+            return ret
+
+        ret = self.sal_yt_link()
+        if ret != MBED_SUCCESS:
+            return ret
+            
+        ret = self.sal_stack_lwip_yt_link()
+        if ret != MBED_SUCCESS:
+            self.sal_yt_unlink()
+            return ret
+            
+        bashCommand = "pushd sal-stack-lwip && yotta list && popd" 
+        ret = self.doBashCmd(bashCommand)
+        if ret != MBED_SUCCESS:
+            dbg(sys._getframe().f_code.co_name + ": failed to yotta list in sal.")
+            self.sal_yt_unlink()
+            self.sal_stack_lwip_yt_unlink()
+            return ret
+
         bashCommand = "pushd sal-stack-lwip && yotta build && popd" 
         ret = self.doBashCmd(bashCommand)
         if ret != MBED_SUCCESS:
@@ -172,9 +295,12 @@ class sal_test:
             self.sal_stack_lwip_unsymlink()
             return ret
 
-        ret = self.sal_stack_lwip_unsymlink()
-        if ret != MBED_SUCCESS:
-            return ret
+        self.sal_yt_unlink()
+        self.sal_stack_lwip_yt_unlink()
+
+        return ret
+        
+
 
 if __name__ == "__main__":
 

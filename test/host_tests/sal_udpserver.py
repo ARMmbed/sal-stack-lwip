@@ -36,6 +36,11 @@ class SalUdpServer(UDPServer):
     def __init__(self, server_address, RequestHandlerClass):
         UDPServer.__init__(self, server_address, RequestHandlerClass)
         self._shutdown_request = False
+        
+        # watchdog guards against the failure mode when the remote target fails 
+        # to send any packets. If the watchdog reaches the high water mark, the 
+        # server is terminated so as not to leave the server thread unterminated
+        self.watchdog = 0.0
 
     def serve_forever(self, poll_interval=0.5):
         """Provide an override that can be shutdown from a request handler.
@@ -46,7 +51,15 @@ class SalUdpServer(UDPServer):
             while not self._shutdown_request:
                 r, w, e = _eintr_retry(select.select, [self], [], [], poll_interval)
                 if self in r:
+                    # reset watchdog
+                    self.watchdog = 0.0
                     self._handle_request_noblock()
+                
+                else:
+                    self.watchdog += poll_interval
+                if self.watchdog > 20.0:
+                    self._shutdown_request = True
+
         finally:
             self._shutdown_request = False
 
@@ -97,6 +110,8 @@ class SalUdpServerTest(BaseHostTest):
 
     def send_server_ip_port(self, selftest, ip_address, port_no):
         """send the udp server {ipaddr, port} to target via serial console."""
+
+        self.watchdog = 0
         
         # Read 3 lines which are sent from client
         print "HOST: About to read 3 lines from target before sending UDP Server {ipaddr, port} tuple." 
@@ -130,6 +145,16 @@ class SalUdpServerTest(BaseHostTest):
                 print "HOST: Terminating Test"
                 break
         
+            # null lines are periodically generated, which can be used to trigger the watchdog
+            elif c.strip() == "":
+                self.watchdog += 1
+                if self.watchdog > 10:
+                    break
+            
+            else:
+                # reset watchdog
+                self.watchdog = 0
+
         return selftest.RESULT_SUCCESS 
 
     def test(self, selftest):

@@ -463,7 +463,7 @@ void app_start(int, char**)
         int ip_4;
     } ip_addr = {0, 0, 0, 0};
 
-    MBED_HOSTTEST_TIMEOUT(20);
+    MBED_HOSTTEST_TIMEOUT(60);
     MBED_HOSTTEST_SELECT(sal_udpserver);
     MBED_HOSTTEST_DESCRIPTION(SalUdpServerTest);
     MBED_HOSTTEST_START("Socket Abstract Layer UDP Connection/Tx/Rx Socket Stream Test");

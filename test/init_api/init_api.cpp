@@ -25,7 +25,7 @@ void app_start(int argc, char *argv[])
 {
     (void) argc;
     (void) argv;
-    MBED_HOSTTEST_TIMEOUT(5);
+    MBED_HOSTTEST_TIMEOUT(60);
     MBED_HOSTTEST_SELECT(default);
     MBED_HOSTTEST_DESCRIPTION(Socket Abstraction Layer construction and utility test);
     MBED_HOSTTEST_START("SAL_INIT_UTIL");

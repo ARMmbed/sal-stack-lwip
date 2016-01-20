@@ -47,7 +47,7 @@ class SalTcpClientTest(BaseHostTest):
         s.connect((ipaddrs, port))
         
         tx_data = "1234567890abcdef"
-        for i in xrange(7):
+        for i in xrange(8):
             s.send(tx_data)
             print "Host: sent %u bytes of data" % len(tx_data)
             rx_data = s.recv(len(tx_data))

@@ -21,9 +21,6 @@
 #include "EthernetInterface.h"
 #include "mbed-drivers/test_env.h"
 
-#define TEST_SERVER "192.168.2.1"
-#define TEST_PORT0 32767
-#define TEST_PORT1 32766
 #define TEST_PORT2 32765
 
 void app_start(int argc, char *argv[])
@@ -35,7 +32,7 @@ void app_start(int argc, char *argv[])
     EthernetInterface eth;
 
     /* mbed greentea init */
-    MBED_HOSTTEST_TIMEOUT(20);
+    MBED_HOSTTEST_TIMEOUT(60);
     MBED_HOSTTEST_SELECT(sal_tcpclient);
     MBED_HOSTTEST_DESCRIPTION(SalTcpClientTest);
     MBED_HOSTTEST_START("Socket Abstract Layer TCP Server Connection/Tx/Rx Socket Stream Test");

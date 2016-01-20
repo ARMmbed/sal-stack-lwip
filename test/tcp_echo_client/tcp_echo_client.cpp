@@ -207,7 +207,7 @@ test_exit:
 
 void app_start(int , char **)
 {
-    MBED_HOSTTEST_TIMEOUT(20);
+    MBED_HOSTTEST_TIMEOUT(60);
     MBED_HOSTTEST_SELECT(sal_tcpserver);
     MBED_HOSTTEST_DESCRIPTION(SalTcpServerTest);
     MBED_HOSTTEST_START("Socket Abstract Layer TCP Connection/Tx/Rx Socket Stream Test");

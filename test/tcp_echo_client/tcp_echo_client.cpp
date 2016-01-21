@@ -212,7 +212,9 @@ void app_start(int , char **)
     MBED_HOSTTEST_DESCRIPTION(SalTcpServerTest);
     MBED_HOSTTEST_START("Socket Abstract Layer TCP Connection/Tx/Rx Socket Stream Test");
 
+    int i = 0;
     int tests_pass = 1;
+    const int max_dhcp_retries = 5;
     int rc;
     char ipbuffer[16];
 
@@ -232,10 +234,31 @@ void app_start(int , char **)
     EthernetInterface eth;
     /* Initialise with DHCP, connect, and start up the stack */
     eth.init();
-    eth.connect();
-    printf("TCP client IP Address is %s\r\n", eth.getIPAddress());
 
-    printf("MBED: TCPClient IP Address is %s\r\n", eth.getIPAddress());
+    /* if the interface fails to get a dhcp lease then retry */
+    for(i = 0; i < max_dhcp_retries; i++)
+    {
+       rc = eth.connect();
+        /* break if we get a lease */
+       if(rc == 0)
+       {
+           printf("TCP client IP Address is %s\r\n", eth.getIPAddress());
+           break;
+       }
+       else
+       {
+           printf("DHCP failure number %d. Retrying DHCP.\r\n", i);
+       }
+
+    }
+    if(i == max_dhcp_retries)
+    {
+        printf("Maximum number of DHCP retries (%d) exceeded. Terminating test.\r\n", i);
+        tests_pass = 0;
+        notify_completion(tests_pass);
+        return;
+    }
+
     sprintf(ipbuffer, "%d.%d.%d.%d", ip_addr.ip_1, ip_addr.ip_2, ip_addr.ip_3, ip_addr.ip_4);
 
     do {

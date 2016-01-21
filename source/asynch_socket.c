@@ -30,6 +30,23 @@
 
 #include "sal-stack-lwip/lwipv4_init.h"
 
+/**
+ * LwIP is not re-entrant for any APIs except pbuf and memp APIs.
+ * To correct for this, all packet processing should be deferred to event context.
+ * However, since sal-driver-lwip-k64f does all packet processing in IRQ context,
+ * we must use the same paradigm here until sal-driver-lwip-k64f is updated to defer
+ * packet processing to event context.
+ *
+ * This issue is tracked at https://github.com/ARMmbed/sal-driver-lwip-k64f-eth/issues/8
+ * TODO: Remove when sal-driver-lwip-k64f-eth/#8 is fixed
+ */
+#ifdef YOTTA_SAL_DRIVER_LWIP_K64F_ETH_VERSION_STRING
+#include "uvisor-lib/uvisor-lib.h"
+
+extern volatile uint8_t emac_timer_fired;
+extern struct pbuf * volatile emac_tcp_push_pcb;
+#endif
+
 #include "lwip/netif.h"
 #include "lwip/sockets.h"
 #include "lwip/udp.h"
@@ -153,13 +170,22 @@ static socket_error_t init()
     return SOCKET_ERROR_NONE;
 }
 
+void check_timeouts() {
+// TODO: Remove when sal-driver-lwip-k64f-eth/#8 is fixed
+#ifdef YOTTA_SAL_DRIVER_LWIP_K64F_ETH_VERSION_STRING
+    emac_timer_fired = 1;
+    vIRQ_SetPendingIRQ(ENET_Receive_IRQn);
+#else
+    sys_check_timeouts();
+#endif
 
+}
 static socket_api_handler_t lwipv4_socket_periodic_task(const struct socket * sock)
 {
     switch(sock->family)
     {
         case SOCKET_STREAM:
-            return sys_check_timeouts;
+            return check_timeouts;
         default:
             break;
     }
@@ -614,7 +640,14 @@ socket_error_t lwipv4_socket_send(struct socket *socket, const void * buf, const
             struct tcp_pcb* pcb = socket->impl;
             err = tcp_write(pcb,buf,len,TCP_WRITE_FLAG_COPY);
             if (tcp_nagle_disabled(pcb)) {
+
+// TODO: Remove when sal-driver-lwip-k64f-eth/#8 is fixed
+#ifdef YOTTA_SAL_DRIVER_LWIP_K64F_ETH_VERSION_STRING
+                emac_tcp_push_pcb = (struct pbuf * volatile)pcb;
+                vIRQ_SetPendingIRQ(ENET_Receive_IRQn);
+#else
                 tcp_output(pcb);
+#endif
             }
             break;
         }

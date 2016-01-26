@@ -24,6 +24,16 @@ from mbed_host_tests import BaseHostTest
 
 
 class SalTcpClientTest(BaseHostTest):
+    # The test loops through a sending/receiving data. On loop i the 
+    # test send 2^(4+i) bytes where i = {0, 1, ... TX_LOOP_MAX}
+    # This is intended to be a data channel functional test rather than a 
+    # stress test so the max tx data length of 4096 bytes is appropriate. 
+    TX_LOOP_MAX = 8
+    # This is the maximum receive size used throught the sal-stack-lwip tests.
+    # Tests are intended to be functional tests rather than stress test, and 
+    # the maximum tx data length is currently 8192. 
+    RX_SIZE_MAX=8192
+
     """
     mbed greentea framework host test script for tcp_echo_server client 
     side functionality. The test does the following:
@@ -43,11 +53,10 @@ class SalTcpClientTest(BaseHostTest):
         "Thread entrypoint for sending and receiving data to/from the remote tcp echo server."
       
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("", 0))
         s.connect((ipaddrs, port))
         
         tx_data = "1234567890abcdef"
-        for i in xrange(8):
+        for i in xrange(self.TX_LOOP_MAX):
             s.send(tx_data)
             print "Host: sent %u bytes of data" % len(tx_data)
             rx_data = s.recv(len(tx_data))
@@ -59,7 +68,7 @@ class SalTcpClientTest(BaseHostTest):
         s.send(data)
         # let remote target terminate the tcp connection
         while True:
-            data = s.recv(1024)
+            data = s.recv(self.RX_SIZE_MAX)
             if not data: 
                 break
         s.close()

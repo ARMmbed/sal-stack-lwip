@@ -1,4 +1,6 @@
-/*
+/**
+ * @file udp_echo_client.cpp
+ *
  * PackageLicenseDeclared: Apache-2.0
  * Copyright (c) 2015 ARM Limited
  *
@@ -27,6 +29,9 @@
 #include "mbed-drivers/mbed.h"
 
 
+/*
+ * Defines
+ */
 #ifndef SOCKET_TEST_TIMEOUT
 #define SOCKET_TEST_TIMEOUT 1.0f
 #endif
@@ -43,6 +48,18 @@
 #define SOCKET_SENDBUF_ITERATIONS 8
 #endif
 
+/* The mbed greentea host test watchdog timeout value is set such that
+ * the test case is expected to report the test {{end}} terminator
+ * before the timeout value expires. If this is not the case, greentea
+ * will terminate the test case and perform recovery actions.
+ */
+#ifndef UDP_ECHO_CLIENT_MBED_HOSTTEST_TIMEOUT
+#define UDP_ECHO_CLIENT_MBED_HOSTTEST_TIMEOUT 60
+#endif
+
+/*
+ * Globals
+ */
 static struct socket *udp_ec_client_socket_g;
 static volatile bool udp_ec_client_event_done_g;
 static volatile bool udp_ec_client_rx_done_g;
@@ -60,17 +77,15 @@ typedef struct udp_ec_tx_rx_context_t
     EthernetInterface* eth_if;
 } udp_ec_tx_rx_context_t;
 
-/*****************************************************************************
- * FUNCTION: udp_ec_sock_addr_port_dump
- *  pretty print a socket address and port with description
- * ARGUMENTS:
- *  description		client string to provide contextural information for
- *                  the ipaddr:port tuple
- *  addr			ip address data structure
- *  port			port number
- * RETURN:
- *  None
- *****************************************************************************/
+
+/** @brief Pretty print a socket address and port with description
+ *
+ *  @param description  Client string to provide contextual information for
+ *                      the ipaddr:port tuple
+ *  @param addr         IP address data structure
+ *  @param port         port number
+ *  @return void
+ */
 static inline void udp_ec_sock_addr_port_dump(const char* description, struct socket_addr* saddr, uint16_t port)
 {
 	if(saddr)
@@ -79,15 +94,9 @@ static inline void udp_ec_sock_addr_port_dump(const char* description, struct so
 	}
 }
 
-/*****************************************************************************
- * FUNCTION: udp_ec_client_cb
- * callback function for handling tx/rx/etc event indications.
- * script
- * ARGUMENTS:
- *  None
- * RETURN:
- *  None
- *****************************************************************************/
+/** @brief Callback function for handling tx/rx/etc event indications.
+ *  @return void
+ */
 static void udp_ec_client_cb()
 {
     struct socket_event *e = udp_ec_client_socket_g->event;
@@ -107,16 +116,14 @@ static void udp_ec_client_cb()
     }
 }
 
-/*****************************************************************************
- * FUNCTION: udp_ec_send_shutdown_host_script
- * send a shutdown command to the host test script to terminate host pc test
- * script
- * ARGUMENTS:
- * srv_addr_s   dotted decimal ip addr string of the remote udp echo server
- * srv_port     port number of the remote udp echo relay server
- * RETURN:
- *  0 => success, !=0 => failure.
- *****************************************************************************/
+/** @brief Send a shutdown command to the host test script to terminate host
+ *         pc test script.
+ *
+ *  @param srv_addr_s Dotted decimal ip addr string of the remote udp echo
+ *                    server.
+ *  @param srv_port   Port number of the remote udp echo relay server.
+ *  @return int, 0 => success, !=0 => failure.
+ */
 static int udp_ec_send_shutdown_host_script(const char* srv_addr_s, uint16_t srv_port)
 {
     struct socket s;
@@ -196,21 +203,19 @@ test_exit:
     return 0;
 }
 
-/*****************************************************************************
- * FUNCTION: udp_ec_tx_rx_from_test
- * This function implements a udp transmitter/receiver to send udp packets to
- * a udp echo relay, and then received them back again. The rx packet data is
- * compared with that transmitted to verify its the same.
+/** @brief This function implements a udp transmitter/receiver to send udp
+ *         packets to a udp echo relay, and then received them back again.
+ *         The rx packet data is compared with that transmitted to verify
+ *         its the same.
  *
- * ARGUMENTS:
- * srv_ipaddr_s	dotted decimal ip addr string of the remote udp echo server
- * srv_port     port number of the remote udp echo relay server
- * connect      connect == false => sendto(), recv_from() will be used.
- *              connect == true => connect(), send(), recv() will be used.
- * context      context data needed to check if tests have passed.
- * RETURN:
- *  0 => success, !=0 => failure.
- *****************************************************************************/
+ *  @param srv_ipaddr_s Dotted decimal ip addr string of the remote udp echo
+ *                      server.
+ *  @param srv_port Port number of the remote udp echo relay server.
+ *  @param connect connect == false => sendto(), recv_from() will be used.
+ *                 connect == true => connect(), send(), recv() will be used.
+ *  @param context context data needed to check if tests have passed.
+ *  @return int, 0 => success, !=0 => failure.
+ */
 static int udp_ec_tx_rx_from_test(const char* srv_ipaddr_s, uint16_t srv_port, bool connect, udp_ec_tx_rx_context_t* context)
 {
     int ret = 0;
@@ -433,49 +438,82 @@ test_exit:
     TEST_RETURN();
 }
 
-/*****************************************************************************
- * FUNCTION: app_start
- *  main() for udp_echo_client test, which tests the socket abtract layer
+/** @brief main() for udp_echo_client test, which tests the socket abstraction
+ *         layer
+ *
  *  udp socket interface by doing the following:
  *  - calling init(), create(), bind(), sendto(), recv_from(), close(),
  *    destroy(), and sending/receiving various size packets including len>mtu.
  *  - calling init(), create(), bind(), connect(), send(), recv(), close(),
  *    destroy(), and sending/receiving various size packets including len>mtu.
- * ARGUMENTS:
- *  None
- * RETURN:
- *  None
- *****************************************************************************/
+ *
+ *  @return void
+ */
 void app_start(int, char**)
 {
-    char udp_srv_ipaddr_s[16];
+    char udp_srv_ipaddr_s[32];
+    char* ptr = NULL;
+    int i = 0;
     int rc;
     int port = 0;
     int tests_pass = 1;
+    /* DHCP lookup can take several seconds e.g. 10s (in some cases much longer)
+     * Taking 10s as a reasonable figure
+     *   5 * 10s = 50s,
+     * 50s is shorter than UDP_ECHO_CLIENT_MBED_HOSTTEST_TIMEOUT
+     */
+    const int max_dhcp_retries = 5;
     EthernetInterface eth;
     udp_ec_tx_rx_context_t context = {&eth};
 
-    struct s_ip_address
-    {
-        int ip_1;
-        int ip_2;
-        int ip_3;
-        int ip_4;
-    } ip_addr = {0, 0, 0, 0};
-
-    MBED_HOSTTEST_TIMEOUT(60);
+    /* mbed greentea init */
+    MBED_HOSTTEST_TIMEOUT(UDP_ECHO_CLIENT_MBED_HOSTTEST_TIMEOUT);
     MBED_HOSTTEST_SELECT(sal_udpserver);
     MBED_HOSTTEST_DESCRIPTION(SalUdpServerTest);
-    MBED_HOSTTEST_START("Socket Abstract Layer UDP Connection/Tx/Rx Socket Stream Test");
+    MBED_HOSTTEST_START("Socket Abstract Layer UDP Connection/Tx/Rx Socket Dgram Test");
 
-    printf("MBED: SAL UDP Client waiting for server IP and port\r\n");
-    scanf("%d.%d.%d.%d:%d", &ip_addr.ip_1, &ip_addr.ip_2, &ip_addr.ip_3, &ip_addr.ip_4, &port);
-    printf("MBED: Address received: %d.%d.%d.%d:%d\r\n", ip_addr.ip_1, ip_addr.ip_2, ip_addr.ip_3, ip_addr.ip_4, port);
-    sprintf(udp_srv_ipaddr_s, "%d.%d.%d.%d", ip_addr.ip_1, ip_addr.ip_2, ip_addr.ip_3, ip_addr.ip_4);
+    scanf("%s", udp_srv_ipaddr_s);
+    if( (ptr = strchr(udp_srv_ipaddr_s, ':')) != NULL )
+    {
+        port = atoi(ptr+1);
+        *ptr = '\0';
+        printf("MBED: Address received: %s:%d\r\n", udp_srv_ipaddr_s, port);
+    }
+    else
+    {
+        printf("MBED: Failed to receive ip address:port\r\n");
+        tests_pass = 0;
+        notify_completion(tests_pass);
+        return;
+    }
 
     /* Initialise with DHCP, connect, and start up the stack */
     eth.init();
-    eth.connect();
+
+    /* if the interface fails to get a dhcp lease then retry */
+    for(i = 0; i < max_dhcp_retries; i++)
+    {
+       rc = eth.connect();
+        /* break if we get a lease */
+       if(rc == 0)
+       {
+           printf("TCP client IP Address is %s\r\n", eth.getIPAddress());
+           break;
+       }
+       else
+       {
+           printf("DHCP failure number %d. Retrying DHCP.\r\n", i);
+       }
+
+    }
+    if(i == max_dhcp_retries)
+    {
+        printf("Maximum number of DHCP retries (%d) exceeded. Terminating test.\r\n", i);
+        tests_pass = 0;
+        notify_completion(tests_pass);
+        return;
+    }
+
     notify_start();
 
     do {

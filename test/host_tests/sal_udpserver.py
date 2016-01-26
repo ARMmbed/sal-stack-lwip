@@ -15,6 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+
 import sys
 import socket
 import select
@@ -22,6 +23,16 @@ import threading
 from sys import stdout
 from SocketServer import BaseRequestHandler, UDPServer, _eintr_retry
 from mbed_host_tests import BaseHostTest
+
+# The watchdog is used to terminate the udp helper thread in the 
+# event of an error condition. This graceful cleanup is required in 
+# particular for the test automation environment where failure to 
+# terminate the thread will leaving a python process and the 
+# inability of the automation system to reuse the server port.
+# The value of the timeout is set to equal the minimum 
+# MBED_HOSTTEST_TIMEOUT value of the target tests using this script
+# (currently udp_echo_client.cpp). 
+SAL_UDPSERVER_WATCHDOG_TIMOUT = 60.0
 
 SalUdpServerDebug=False
 
@@ -57,7 +68,7 @@ class SalUdpServer(UDPServer):
                 
                 else:
                     self.watchdog += poll_interval
-                if self.watchdog > 20.0:
+                if self.watchdog > SAL_UDPSERVER_WATCHDOG_TIMOUT:
                     self._shutdown_request = True
 
         finally:
@@ -111,7 +122,7 @@ class SalUdpServerTest(BaseHostTest):
     def send_server_ip_port(self, selftest, ip_address, port_no):
         """send the udp server {ipaddr, port} to target via serial console."""
 
-        self.watchdog = 0
+        self.watchdog = 0.0
         
         # Read 3 lines which are sent from client
         print "HOST: About to read 3 lines from target before sending UDP Server {ipaddr, port} tuple." 
@@ -147,13 +158,13 @@ class SalUdpServerTest(BaseHostTest):
         
             # null lines are periodically generated, which can be used to trigger the watchdog
             elif c.strip() == "":
-                self.watchdog += 1
-                if self.watchdog > 10:
+                self.watchdog += 1.0
+                if self.watchdog > SAL_UDPSERVER_WATCHDOG_TIMOUT:
                     break
             
             else:
                 # reset watchdog
-                self.watchdog = 0
+                self.watchdog = 0.0
 
         return selftest.RESULT_SUCCESS 
 

@@ -12,6 +12,16 @@ from SocketServer import BaseRequestHandler, TCPServer, _eintr_retry
 from mbed_host_tests import BaseHostTest
 
 
+# The watchdog is used to terminate the tcp helper thread in the 
+# event of an error condition. This graceful cleanup is required in 
+# particular for the test automation environment where failure to 
+# terminate the thread will leaving a python process and the 
+# inability of the automation system to reuse the server port.
+# The value of the timeout is set to equal the minimum 
+# MBED_HOSTTEST_TIMEOUT value of the target tests using this script
+# (currently tcp_echo_client.cpp). 
+SAL_TCPSERVER_WATCHDOG_TIMOUT = 60.0
+
 class TCPServerV4(TCPServer):
     address_family = socket.AF_INET
     allow_reuse_address = True
@@ -43,7 +53,7 @@ class TCPServerV4(TCPServer):
                     self.watchdog += poll_interval
                 
                 
-                if self.watchdog > 20.0:
+                if self.watchdog > SAL_TCPSERVER_WATCHDOG_TIMOUT:
                     self._shutdown_request = True
                 
         finally:
@@ -52,7 +62,18 @@ class TCPServerV4(TCPServer):
         
 
 class TCPHandler(BaseRequestHandler):
+    # This is the maximum receive size used throught the sal-stack-lwip tests.
+    # Tests are intended to be functional tests rather than stress test, and 
+    # the maximum tx data length is currently 8192.
+    #  
+    # In tcp_client_echo.cpp (the target side companion to this script): 
+    #  tx_len_max = SOCKET_SENDBUF_BLOCKSIZE * 2^SOCKET_SENDBUF_ITERATIONS 
+    #             = 32 * 2^8 = 8192.
     MAX_RX_SIZE = 8192
+    
+    # The intention is to allow the client to close the connection rather than this
+    # server. The client is given TARGET_SHUTDOWN_TIMEOUT seconds to do so.  
+    TARGET_SHUTDOWN_TIMEOUT = 5
     def handle(self):
         """ One handle per connection
         """
@@ -73,7 +94,7 @@ class TCPHandler(BaseRequestHandler):
             if data == "shutdown":
                 print("HOST: Requesting server shutdown\n")
                 # give the remote end time to close its connection, which is part of the test
-                time.sleep(5)
+                time.sleep(self.TARGET_SHUTDOWN_TIMEOUT)
                 self.server._shutdown_request = True
                 break
 
@@ -88,7 +109,7 @@ class SalTcpServerTest(BaseHostTest):
         """ Set up network host. Reset target and and send server IP via 
         serial to a mbed board."""
 
-        self.watchdog = 0
+        self.watchdog = 0.0
 
         # Read 3 lines which are sent from client, This will be fixed in greentea
         for i in range(0, 3):
@@ -125,13 +146,13 @@ class SalTcpServerTest(BaseHostTest):
 
             # null lines are periodically generated, which can be used to trigger the watchdog
             elif c.strip() == "":
-                self.watchdog += 1
-                if self.watchdog > 10:
+                self.watchdog += 1.0
+                if self.watchdog > SAL_TCPSERVER_WATCHDOG_TIMOUT:
                     break
             
             else:
                 # reset watchdog
-                self.watchdog = 0
+                self.watchdog = 0.0
 
         
     def test(self, selftest):

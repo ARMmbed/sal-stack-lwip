@@ -1,4 +1,6 @@
-/*
+/**
+ * @file tcp_echo_client.cpp
+ *
  * PackageLicenseDeclared: Apache-2.0
  * Copyright (c) 2015 ARM Limited
  *
@@ -22,11 +24,25 @@
 #include "mbed-drivers/test_env.h"
 #include "sal/socket_api.h"
 
+/*
+ * Defines
+ */
 #ifndef TCP_EC_SOCKET_TEST_TIMEOUT
 #define TCP_EC_SOCKET_TEST_TIMEOUT 1.0f
 #endif
 
+/* The mbed greentea host test watchdog timeout value is set such that
+ * the test case is expected to report the test {{end}} terminator
+ * before the timeout value expires. If this is not the case, greentea
+ * will terminate the test case and perform recovery actions.
+ */
+#ifndef TCP_ECHO_CLIENT_MBED_HOSTTEST_TIMEOUT
+#define TCP_ECHO_CLIENT_MBED_HOSTTEST_TIMEOUT 60
+#endif
 
+/*
+ * Globals
+ */
 static struct socket *tcp_ec_client_socket_g;
 static volatile bool tcp_ec_client_event_done_g;
 static volatile bool tcp_ec_client_rx_done_g;
@@ -42,17 +58,14 @@ static void onTimeout() {
 }
 
 
-/*****************************************************************************
- * FUNCTION: tcp_ec_sock_addr_port_dump
- *  pretty print a socket address and port with description
- * ARGUMENTS:
- *  description     client string to provide contextural information for
- *                  the ipaddr:port tuple
- *  addr            ip address data structure
- *  port            port number
- * RETURN:
- *  None
- *****************************************************************************/
+/** @brief Pretty print a socket address and port with description
+ *
+ *  @param description  Client string to provide contextual information for
+ *                      the ipaddr:port tuple
+ *  @param addr         IP address data structure
+ *  @param port         port number
+ *  @return void
+ */
 static inline void tcp_ec_sock_addr_port_dump(const char* description, struct socket_addr* saddr, uint16_t port)
 {
     if(saddr)
@@ -61,15 +74,9 @@ static inline void tcp_ec_sock_addr_port_dump(const char* description, struct so
     }
 }
 
-/*****************************************************************************
- * FUNCTION: tcp_ec_client_cb
- * callback function for handling tx/rx/etc event indications.
- * script
- * ARGUMENTS:
- *  None
- * RETURN:
- *  None
- *****************************************************************************/
+/** @brief Callback function for handling tx/rx/etc event indications.
+ *  @return void
+ */
 static void tcp_ec_client_cb()
 {
     struct socket_event *e = tcp_ec_client_socket_g->event;
@@ -95,26 +102,26 @@ static void tcp_ec_client_cb()
     }
 }
 
-/*****************************************************************************
- * FUNCTION: tcp_ec_send_shutdown_host_script
- * send a shutdown command to the host test script to terminate host pc test
- * script
- * ARGUMENTS:
- * srv_addr_s   dotted decimal ip addr string of the remote tcp echo server
- * srv_port     port number of the remote tcp echo relay server
- * RETURN:
- *  0 => success, !=0 => failure.
- *****************************************************************************/
+/** @brief Send a shutdown command to the host test script to terminate host PC
+ *         test.
+ *  @param srv_addr_s Dotted decimal ip addr string of the remote tcp echo
+ *                    server.
+ *  @param srv_port   Port number of the remote tcp echo relay server.
+ *  @return int, 0 => success, !=0 => failure.
+ */
 static int tcp_ec_send_shutdown_host_script(const char* srv_addr_s, uint16_t srv_port)
 {
+    int ret = 0;
     struct socket s;
     socket_error_t err;
     struct socket_addr srv_saddr = {0, 0, 0, 0};
     struct socket_addr local_saddr = {0, 0, 0, 0};
+    struct socket_addr local_saddr_chk = {0, 0, 0, 0};
     const struct socket_api *api = socket_get_api(SOCKET_STACK_LWIP_IPV4);
     mbed::Timeout to;
     const char* shutdown_cmd = "shutdown";
     uint16_t local_port = 0;
+    uint16_t local_port_chk = 0;
 
     TEST_CLEAR();
     tcp_ec_client_socket_g = &s;
@@ -135,10 +142,21 @@ static int tcp_ec_send_shutdown_host_script(const char* srv_addr_s, uint16_t srv
         TEST_RETURN();
     }
 
+    /* check socket is bound to to a local ip addr:port */
+    api->get_local_addr(&s, &local_saddr_chk);
+    api->get_local_port(&s, &local_port_chk);
+    /* check that the local_saddr is not 0.0.0.0 */
+    ret = socket_addr_is_any(&local_saddr);
+    if(!TEST_EQ(ret, 0)) {
+        TEST_PRINT("[FAIL] bind() failed as local address (%s) is INADDR_ANY\r\n", inet_ntoa(local_saddr_chk));
+    }
+    if(!TEST_EQ(local_port_chk, 0)) {
+        TEST_PRINT("[FAIL] bind() failed as local port (%d) is 0\r\n", local_port_chk);
+    }
+
     err = api->str2addr(&s, &srv_saddr, srv_addr_s);
     TEST_EQ(err, SOCKET_ERROR_NONE);
     tcp_ec_sock_addr_port_dump("server", &srv_saddr, srv_port);
-
 
     tcp_ec_timeout_g = 0;
     tcp_ec_connected = 0;
@@ -205,31 +223,48 @@ test_exit:
 }
 
 
+/** @brief Main application entry point for the test case
+ *
+ *  This mbed greentea test case implements a tcp client which sends/receive
+ *  data to/from to the tcp echo server (sal_tcpserver.py).
+ *  @return void
+ */
 void app_start(int , char **)
 {
-    MBED_HOSTTEST_TIMEOUT(60);
+    char* ptr = NULL;
+    int i = 0;
+    int tests_pass = 1;
+    /* DHCP lookup can take several seconds e.g. 10s (in some cases much longer)
+     * Taking 10s as a reasonable figure
+     *   5 * 10s = 50s,
+     * 50s is shorter than TCP_ECHO_CLIENT_MBED_HOSTTEST_TIMEOUT
+     */
+    const int max_dhcp_retries = 5;
+    int rc;
+    char ipbuffer[32];
+    int port = 0;
+
+    /* mbed greentea init */
+    MBED_HOSTTEST_TIMEOUT(TCP_ECHO_CLIENT_MBED_HOSTTEST_TIMEOUT);
     MBED_HOSTTEST_SELECT(sal_tcpserver);
     MBED_HOSTTEST_DESCRIPTION(SalTcpServerTest);
     MBED_HOSTTEST_START("Socket Abstract Layer TCP Connection/Tx/Rx Socket Stream Test");
 
-    int i = 0;
-    int tests_pass = 1;
-    const int max_dhcp_retries = 5;
-    int rc;
-    char ipbuffer[16];
-
-    struct s_ip_address
-    {
-        int ip_1;
-        int ip_2;
-        int ip_3;
-        int ip_4;
-    } ip_addr = {0, 0, 0, 0};
-    int port = 0;
-
     printf("MBED: SAL TCP Client waiting for server IP and port...\r\n");
-    scanf("%d.%d.%d.%d:%d", &ip_addr.ip_1, &ip_addr.ip_2, &ip_addr.ip_3, &ip_addr.ip_4, &port);
-    printf("MBED: Address received: %d.%d.%d.%d:%d\r\n", ip_addr.ip_1, ip_addr.ip_2, ip_addr.ip_3, ip_addr.ip_4, port);
+    scanf("%s", ipbuffer);
+    if( (ptr = strchr(ipbuffer, ':')) != NULL )
+    {
+        port = atoi(ptr+1);
+        *ptr = '\0';
+        printf("MBED: Address received: %s:%d\r\n", ipbuffer, port);
+    }
+    else
+    {
+        printf("MBED: Failed to receive ip address:port\r\n");
+        tests_pass = 0;
+        notify_completion(tests_pass);
+        return;
+    }
 
     EthernetInterface eth;
     /* Initialise with DHCP, connect, and start up the stack */
@@ -249,7 +284,6 @@ void app_start(int , char **)
        {
            printf("DHCP failure number %d. Retrying DHCP.\r\n", i);
        }
-
     }
     if(i == max_dhcp_retries)
     {
@@ -258,8 +292,6 @@ void app_start(int , char **)
         notify_completion(tests_pass);
         return;
     }
-
-    sprintf(ipbuffer, "%d.%d.%d.%d", ip_addr.ip_1, ip_addr.ip_2, ip_addr.ip_3, ip_addr.ip_4);
 
     do {
         socket_error_t err = lwipv4_socket_init();

@@ -537,7 +537,6 @@ void irqUDPRecv(void * arg, struct udp_pcb * upcb,
 
 err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
 {
-    (void) tpcb;
     struct socket_event e;
     struct socket *s = (struct socket *) arg;
 
@@ -555,8 +554,17 @@ err_t irqTCPRecv(void * arg, struct tcp_pcb * tpcb, struct pbuf * p, err_t err)
         s->event = &e;
         ((socket_api_handler_t) (s->handler))();
         s->event = NULL;
-        /* Zero the impl, since a disconnect will cause a free */
-        s->impl = NULL;
+        /* if close has been called, we have to remove impl, since it could be freed */
+        switch (tpcb->state) {
+            case FIN_WAIT_1:
+            case FIN_WAIT_2:
+            case TIME_WAIT:
+                /* Zero the impl, since a disconnect will cause a free */
+                s->impl = NULL;
+                break;
+            default:
+                break;
+        }
         return ERR_OK;
     }
 

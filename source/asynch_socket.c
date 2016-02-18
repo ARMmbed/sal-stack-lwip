@@ -533,12 +533,29 @@ static socket_error_t lwipv4_socket_bind(struct socket *sock, const struct socke
 }
 
 static void rx_core(struct socket * s, struct pbuf *p) {
-
+    /** NOTE: the receive callback for both UDP and TCP are responsible for deallocating pbufs, so there is no call to
+     *  pbuf_ref() required here.
+     */
     __disable_irq();
     if (s->rxBufChain == NULL) {
         s->rxBufChain = p;
     } else {
-        pbuf_cat((struct pbuf *) s->rxBufChain, p);
+        struct pbuf * q = (struct pbuf *)s->rxBufChain;
+        switch(s->family) {
+            case SOCKET_DGRAM:
+                // find the last element of the buffer chain.
+                while (q->next) {q = q->next;}
+                /**
+                 * Attach p to it wihout changing the tot_len of the buffer chain
+                 * NOTE: This is not how pbufs are intended to work, but it is necessary to deal with a) fragmentation
+                 * and b) packet queueing
+                 */
+                q->next = p;
+                break;
+            case SOCKET_STREAM:
+                pbuf_cat((struct pbuf *) s->rxBufChain, p);
+                break;
+        }
     }
     __enable_irq();
 }
@@ -728,6 +745,8 @@ static socket_error_t recv_validate(struct socket *socket, void * buf, size_t *l
         return SOCKET_ERROR_NULL_PTR;
     }
     if (*len == 0) {
+        struct pbuf * p = (struct pbuf *)socket->rxBufChain;
+        *len = p->tot_len;
         return SOCKET_ERROR_SIZE;
     }
     if (socket->rxBufChain == NULL) {

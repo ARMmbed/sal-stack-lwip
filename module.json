@@ -49,7 +49,7 @@
     }
   },
   "testDependencies": {
-    "mbed-drivers": "~0.11.1"
+    "mbed-drivers": "~0.12.1"
   },
   "scripts": {
     "testReporter": [

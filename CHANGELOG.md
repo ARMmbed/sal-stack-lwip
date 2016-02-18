@@ -3,6 +3,12 @@ All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+## [1.2.0]
+### Fixed
+- When saving UDP packets in interrupt context, do not call `pbuf_cat`, simply link the current pbuf to the last pbuf instead.
+### Added
+- As a convenience, when `recv` is called with `*len=0`, len is modified to the length of the available data (for TCP) or the length of the next datagram (for UDP)
+
 ## [1.1.4] - 2016-01-27
 ### Fixed
 - Removed a race condition that was present on disconnect

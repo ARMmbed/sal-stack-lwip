@@ -67,6 +67,8 @@
 #define MEMP_NUM_TCP_PCB            4
 #endif
 
+#define LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT 1
+
 #define MEMP_NUM_PBUF               8
 
 #define TCP_QUEUE_OOSEQ             0

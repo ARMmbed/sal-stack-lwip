@@ -55,8 +55,8 @@
 
 #endif // #if NO_SYS == 0
 
-// 32-bit alignment
-#define MEM_ALIGNMENT               4
+// 8-byte alignment to match ARM's ABI
+#define MEM_ALIGNMENT               8
 
 #define PBUF_POOL_SIZE              5
 #define MEMP_NUM_TCP_PCB_LISTEN     4

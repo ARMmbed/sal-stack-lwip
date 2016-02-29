@@ -47,10 +47,14 @@
     "k64f": {
       "sal-driver-lwip-k64f-eth": "^1.0.3",
       "sal-iface-eth": "^1.0.0"
+    },
+    "nuvoton" : {
+      "sal-driver-lwip-nuvoton" : "^1.0.0",
+      "sal-iface-eth" : "^1.0.0"
     }
   },
   "testDependencies": {
-    "mbed-drivers": "~0.12.1"
+    "mbed-drivers": "^1.0.0"
   },
   "scripts": {
     "testReporter": [

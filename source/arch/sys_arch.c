@@ -21,6 +21,7 @@
 #include "mbed-drivers/mbed_error.h"
 #include "mbed-drivers/mbed_interface.h"
 #include "mbed-hal/us_ticker_api.h"
+#include "core-util/critical.h"
 
 /* lwIP includes. */
 #include "lwip/opt.h"
@@ -71,19 +72,14 @@ u32_t sys_now(void) {
   return (u32_t) systick_timems;
 }
 
-// TODO: the next two functions completely disable/enable interrupts to implement sys_arch_(un)protect. Bad idea.
 sys_prot_t sys_arch_protect(void) {
-  if (__get_PRIMASK() != 0)
-    return 1;
-  __set_PRIMASK(1);
+  core_util_critical_section_enter();
   return 0;
 }
 
 void sys_arch_unprotect(sys_prot_t lev) {
-  /* Only turn interrupts back on if they were originally on when the matching
-     sys_arch_protect() call was made. */
-  if(!lev)
-    __set_PRIMASK(0);
+    (void) lev;
+    core_util_critical_section_exit();
 }
 
 #else

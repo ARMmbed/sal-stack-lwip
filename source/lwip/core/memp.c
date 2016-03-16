@@ -168,8 +168,8 @@ static u8_t *const memp_bases[] = {
 
 #if defined(TARGET_LPC1768)
 #  define ETHMEM_SECTION __attribute((section("AHBSRAM1")))
-#elif defined(TARGET_LPC4088) || defined(TARGET_K64F) || defined(TARGET_RZ_A1H)
-#  define ETHMEM_SECTION 
+#elif defined(TARGET_LPC4088) || defined(TARGET_K64F) || defined(TARGET_RZ_A1H) || defined(TARGET_LIKE_NUC472)
+#  define ETHMEM_SECTION
 #endif
 
 /** This is the actual memory used by the pools (all pools in one big block). */

@@ -4,6 +4,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2016-03-16
+### Added
+- Support for NUC472 MCU
+
 ## [1.3.0]
 ### Improved
 - Replaced `__get_PRIMASK()` and `__set_PRIMASK()` with `core_util_critical_section_enter()` and `core_util_critical_section_exit()`
@@ -46,7 +50,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - C++11 compilation warnings
 
-[Unreleased]: https://github.com/ARMmbed/sal-stack-lwip/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ARMmbed/sal-stack-lwip/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/ARMmbed/sal-stack-lwip/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/ARMmbed/sal-stack-lwip/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ARMmbed/sal-stack-lwip/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/ARMmbed/sal-stack-lwip/compare/v1.1.3...v1.1.4

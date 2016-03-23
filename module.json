@@ -1,6 +1,6 @@
 {
   "name": "sal-stack-lwip",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Lightweight IP",
   "keywords": [
     "lwip",
@@ -41,16 +41,16 @@
   ],
   "dependencies": {
     "sal": "^1.1.2",
-    "core-util" : "^1.5.0"
+    "core-util": "^1.5.0"
   },
   "targetDependencies": {
     "k64f": {
       "sal-driver-lwip-k64f-eth": "^1.0.3",
       "sal-iface-eth": "^1.0.0"
     },
-    "nuvoton" : {
-      "sal-driver-lwip-nuvoton" : "^1.0.0",
-      "sal-iface-eth" : "^1.0.0"
+    "nuvoton": {
+      "sal-driver-lwip-nuvoton": "^1.0.0",
+      "sal-iface-eth": "^1.0.0"
     }
   },
   "testDependencies": {
